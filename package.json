@@ -5,8 +5,16 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "demo": "electron demo.js",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "test:smoke": "electron smoke-test.js",
+    "test:integration": "electron integration-test.js",
+    "test:cours": "electron cours-test.js",
+    "test:excel": "electron excel-test.js",
+    "test:annee": "electron annee-test.js",
+    "test:card": "electron card-check.js",
+    "screenshots": "electron screenshot.js"
   },
   "author": "",
   "license": "ISC",
@@ -22,7 +30,9 @@
     }
   },
   "dependencies": {
-    "sql.js": "^1.14.2"
+    "sql.js": "^1.14.2",
+    "chart.js": "^4.4.7",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
     "electron": "^32.0.0",
