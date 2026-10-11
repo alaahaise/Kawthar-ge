@@ -1,0 +1,31 @@
+{
+  "name": "gestion-etudiants",
+  "version": "1.0.0",
+  "description": "Application de gestion des étudiants - inscription, recherche, cartes",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "",
+  "license": "ISC",
+  "build": {
+    "appId": "com.elkawther.gestionetudiants",
+    "productName": "Gestion des Étudiants",
+    "files": [
+      "**/*",
+      "!dist/**"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "dependencies": {
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^26.15.3"
+  }
+}
