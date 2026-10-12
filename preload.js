@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  // Signal « interface prête » : ferme l'écran de démarrage au bon moment.
+  appPret: () => ipcRenderer.invoke('app:pret'),
   // Écritures groupées (imports, remplissage de démonstration)
   dbBeginBatch: () => ipcRenderer.invoke('db:beginBatch'),
   dbEndBatch: () => ipcRenderer.invoke('db:endBatch'),

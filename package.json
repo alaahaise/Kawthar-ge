@@ -16,7 +16,8 @@
     "test:card": "electron card-check.js",
     "screenshots": "electron screenshot.js",
     "build:css": "tailwindcss -i src/design-system.css -o src/generated.css --minify",
-    "watch": "tailwindcss -i src/design-system.css -o src/generated.css --watch"
+    "watch": "tailwindcss -i src/design-system.css -o src/generated.css --watch",
+    "test:splash": "electron splash-check.js"
   },
   "author": "",
   "license": "ISC",

@@ -2278,9 +2278,13 @@
     showYearBanner(anneeInfo);
     refreshStats();
     refreshMatieresStats();
-    refreshDashboardCharts();
-    refreshStudentList();
+    await refreshDashboardCharts();
+    await refreshStudentList();
     updateStudentsFilterHint();
+
+    // L'interface est prete : le processus principal ferme l'ecran de
+    // demarrage. Sans ce signal, il ne peut que deviner (et se tromper).
+    await window.api.appPret();
   }
 
 })();

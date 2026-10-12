@@ -464,6 +464,33 @@ function closeSplash() {
 }
 
 /**
+ * Planifie la fermeture de l'écran de démarrage, une seule fois.
+ *
+ * 'ready-to-show' peut s'être déclenché AVANT l'abonnement du rappel : sur une
+ * machine rapide ou une base déjà en cache, la fenêtre est déjà peinte au
+ * moment où on écoute. Le rappel n'est alors jamais appelé et l'écran de
+ * chargement reste bloqué jusqu'au filet de sécurité de 8 s — l'application
+ * paraît figée au démarrage. C'est pour cela que la fermeture est protégée par
+ * ce verrou, et que le rendu signale en plus sa propre disponibilité.
+ */
+let splashFermeturePlanifiee = false;
+function scheduleSplashCloseOnce(minimumMs) {
+  if (splashFermeturePlanifiee) return;
+  splashFermeturePlanifiee = true;
+  scheduleSplashClose(minimumMs);
+}
+
+// Signal explicite du rendu : il connaît le moment exact où l'interface est
+// prête (données chargées, graphiques rendus), ce que le processus principal ne
+// peut pas deviner.
+ipcMain.handle('app:pret', () => {
+  // 1,2 s : en dessous, l'écran de chargement n'est qu'un clignement, ce qui
+  // paraît moins professionnel que de ne pas l'afficher du tout.
+  scheduleSplashCloseOnce(1200);
+  return { success: true };
+});
+
+/**
  * Ferme l'écran de démarrage une fois la fenêtre principale prête, en
  * respectant une durée minimale : sinon il n'apparaît qu'une fraction de
  * seconde et clignote, ce qui paraît moins professionnel que de ne pas
@@ -511,8 +538,10 @@ app.whenReady().then(async () => {
   createWindow();
 
   // Le splash reste affiché tant que la fenêtre principale charge son script.
-  mainWindow.once('ready-to-show', () => scheduleSplashClose(1200));
-  // Filet de sécurité si 'ready-to-show' n'arrive jamais.
+  mainWindow.once('ready-to-show', () => scheduleSplashCloseOnce(1200));
+  if (!mainWindow.webContents.isLoading()) scheduleSplashCloseOnce(1200);
+
+  // Filet de sécurité si aucun signal n'arrive.
   setTimeout(closeSplash, 8000);
 
   app.on('activate', () => {
