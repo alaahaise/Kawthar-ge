@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld('api', {
   // ---------- Inscriptions étudiant <-> matière/enseignant ----------
   getStudentMatieres: (studentId) => ipcRenderer.invoke('studentMatieres:listForStudent', studentId),
   setStudentMatieres: (payload) => ipcRenderer.invoke('studentMatieres:setForStudent', payload),
+  // Congé / retour : un élève en congé reste en base, ses paiements sont conservés.
+  basculerEleveActif: (payload) => ipcRenderer.invoke('students:basculerActif', payload),
+  historiqueEleve: (studentId) => ipcRenderer.invoke('students:historique', studentId),
+  reinitialiserEleve: (payload) => ipcRenderer.invoke('students:reinitialiser', payload),
   listStudentsForMatiere: (payload) => ipcRenderer.invoke('studentMatieres:listForMatiere', payload),
   enrollStudent: (payload) => ipcRenderer.invoke('studentMatieres:enroll', payload),
   unenrollStudent: (payload) => ipcRenderer.invoke('studentMatieres:unenroll', payload),

@@ -254,6 +254,23 @@ async function initDatabase() {
       adresse TEXT,
       photo TEXT,
       date_inscription TEXT,
+      actif INTEGER NOT NULL DEFAULT 1,
+      date_sortie TEXT,
+      motif_sortie TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Historique des départs et des retours : permet de tracer un élève dans le
+  // temps plutôt que d'écraser son statut.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS historique_eleves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      evenement TEXT NOT NULL,
+      date_evenement TEXT,
+      motif TEXT,
+      detail TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
@@ -309,7 +326,13 @@ async function initDatabase() {
     'ALTER TABLE matieres ADD COLUMN prix_mensuel INTEGER DEFAULT 0',
     'ALTER TABLE matieres ADD COLUMN description TEXT',
     // Cours : un enseignant qui assure une matière, avec SON tarif mensuel.
-    'ALTER TABLE matiere_teachers ADD COLUMN prix_mensuel INTEGER NOT NULL DEFAULT 0'
+    'ALTER TABLE matiere_teachers ADD COLUMN prix_mensuel INTEGER NOT NULL DEFAULT 0',
+    // Élève : présent ou parti. Un élève qui quitte l'établissement reste dans
+    // la base (ses paiements passés doivent être conservés) mais n'apparaît plus
+    // dans les listes actives ni dans les grilles.
+    'ALTER TABLE students ADD COLUMN actif INTEGER NOT NULL DEFAULT 1',
+    'ALTER TABLE students ADD COLUMN date_sortie TEXT',
+    'ALTER TABLE students ADD COLUMN motif_sortie TEXT'
   ];
   softMigrations.forEach((sql) => {
     try {
@@ -584,16 +607,27 @@ ipcMain.handle('students:list', (event, params) => {
   const unpaidAnnee = p.unpaid_annee ? parseInt(p.unpaid_annee, 10) : null;
   const unpaidMois = p.unpaid_mois ? parseInt(p.unpaid_mois, 10) : null;
 
-  // Filtre d'état : « payé / impayé » pour une matière et un mois donnés.
+  // Filtre d'état payé / impayé.
+  //
+  // Périmètre en cascade : matière seule, matière + enseignant, ou aucun des
+  // deux (= tous les cours suivis par l'élève).
   const statutMatiere = p.paiement_matiere ? parseInt(p.paiement_matiere, 10) : null;
   const statutMois = p.paiement_mois ? parseInt(p.paiement_mois, 10) : null;
   const statutAnnee = p.paiement_annee ? parseInt(p.paiement_annee, 10) : null;
+  const statutTeacher = p.paiement_teacher ? parseInt(p.paiement_teacher, 10) : null;
   const statut = p.statut === 'paye' || p.statut === 'impaye' ? p.statut : '';
+
+  // Par défaut on ne liste que les élèves présents. `actif` = 0 pour en faire
+  // aparecer aussi les partis, 2 pour les seuls partis.
+  const filtreActif = p.actif === 0 || p.actif === '0' ? 0 : p.actif === 2 || p.actif === '2' ? 2 : 1;
 
   let sql = 'SELECT DISTINCT s.* FROM students s';
   const joins = [];
   const conditions = [];
   const values = [];
+
+  if (filtreActif === 1) conditions.push("COALESCE(s.actif, 1) = 1");
+  else if (filtreActif === 2) conditions.push('COALESCE(s.actif, 1) = 0');
 
   if (matiereId || teacherId || unpaidMatiereId) {
     joins.push('LEFT JOIN student_matieres sm ON sm.student_id = s.id');
@@ -607,7 +641,7 @@ ipcMain.handle('students:list', (event, params) => {
     values.push(teacherId);
   }
   if (unpaidMatiereId && unpaidAnnee && unpaidMois) {
-    //Étudiants inscrits à la matière ET sans ligne payée pour ce mois.
+    // Étudiants inscrits à la matière ET sans ligne payée pour ce mois.
     conditions.push(
       'EXISTS (SELECT 1 FROM student_matieres x WHERE x.student_id = s.id AND x.matiere_id = ?) ' +
         'AND NOT EXISTS (SELECT 1 FROM paiements py WHERE py.student_id = s.id AND py.matiere_id = ? AND py.annee = ? AND py.mois = ? AND py.paye = 1)'
@@ -615,19 +649,64 @@ ipcMain.handle('students:list', (event, params) => {
     values.push(unpaidMatiereId, unpaidMatiereId, unpaidAnnee, unpaidMois);
   }
 
-  if (statut && statutMatiere && statutMois && statutAnnee) {
-    // Un élève correspond s'il a au moins un professeur de cette matière dont
-    // le paiement du mois est dans l'état demandé.
+  // ---------------------------------------------------------------------
+  // unpaid = l'élève a AU MOINS UN mois dû, sur un cours du périmètre.
+  //
+  // Un mois est dû quand il est facturable ET non réglé. « Facturable » veut
+  // dire trois choses, et c'est tout le sujet :
+  //
+  //   1. l'élève était inscrit à CE cours à ce moment-là. Sans cette
+  //      condition, un élève arrivé en mars apparaîtrait débiteur de janvier ;
+  //   2. le mois n'est pas encore à venir (année future, ou mois en cours du
+  //      mois courant). On ne facture pas ce qui n'est pas échu ;
+  //   3. il n'existe pas de ligne payée pour ce mois.
+  //
+  // Point important : l'absence de ligne de paiement ne signifie PAS « rien
+  // dû ». Dans cette base, une ligne n'est écrite que lorsqu'on enregistre un
+  // règlement ; un élève inscrit et jamais saisi doit donc apparaître comme
+  // impayé, pas être considéré à jour.
+  // ---------------------------------------------------------------------
+  if (statut && statutAnnee) {
+    const anneeRef = new Date().getFullYear();
+    const moisRef = new Date().getMonth() + 1;
+
+    // Toutes les valeurs ci-dessous sont des entiers issus de parseInt() ou de
+    // Date : aucune n'est une chaîne fournie par l'utilisateur, l'inlining est
+    // donc sans risque et évite de mantener l'ordre des paramètres à jour.
+    const MOIS = Array.from({ length: 12 }, (_, i) => `SELECT ${i + 1} AS m`).join(' UNION ALL ');
+
+    const anneeInsc = `COALESCE(CAST(NULLIF(substr(TRIM(x.date_inscription), 7, 4), '') AS INTEGER), ${anneeRef})`;
+    const moisInsc = `COALESCE(CAST(NULLIF(substr(TRIM(x.date_inscription), 4, 2), '') AS INTEGER), 1)`;
+
+    const perimetre =
+      (statutMatiere ? ` AND x.matiere_id = ${statutMatiere}` : '') +
+      (statutTeacher ? ` AND x.teacher_id = ${statutTeacher}` : '');
+    const borneMois = statutMois ? ` AND mo.m = ${statutMois}` : '';
+
+    // Mois facturable : postérieur à l'inscription, et non échu.
+    const facturable = `(
+      (${statutAnnee} > ${anneeInsc} OR (${statutAnnee} = ${anneeInsc} AND mo.m >= ${moisInsc}))
+      AND (${statutAnnee} < ${anneeRef} OR (${statutAnnee} = ${anneeRef} AND mo.m <= ${moisRef}))
+    )`;
+
     const cible = statut === 'paye' ? 1 : 0;
+
     conditions.push(
-      `EXISTS (SELECT 1 FROM student_matieres x
-               LEFT JOIN paiements py
-                 ON py.student_id = x.student_id AND py.matiere_id = x.matiere_id
-                AND py.teacher_id IS x.teacher_id AND py.annee = ? AND py.mois = ?
-               WHERE x.student_id = s.id AND x.matiere_id = ?
-                 AND COALESCE(py.paye, 0) = ?)`
+      `EXISTS (
+         SELECT 1
+         FROM student_matieres x
+         CROSS JOIN (${MOIS}) mo
+         LEFT JOIN paiements py
+           ON py.student_id = x.student_id
+          AND py.matiere_id = x.matiere_id
+          AND py.teacher_id IS x.teacher_id
+          AND py.annee = ${statutAnnee}
+          AND py.mois = mo.m
+         WHERE x.student_id = s.id${perimetre}${borneMois}
+           AND ${facturable}
+           AND COALESCE(py.paye, 0) = ${cible}
+       )`
     );
-    values.push(statutAnnee, statutMois, statutMatiere, cible);
   }
 
   if (search !== '') {
@@ -744,7 +823,7 @@ ipcMain.handle('students:update', (event, student) => {
     }
 
     db.run(
-      `UPDATE students SET matricule=?, nom=?, prenom=?, date_naissance=?, classe=?, telephone=?, telephone_parent=?, adresse=?, photo=?, date_inscription=?
+      `UPDATE students SET matricule=?, nom=?, prenom=?, date_naissance=?, classe=?, telephone=?, telephone_parent=?, adresse=?, photo=?, date_inscription=?, actif=?, date_sortie=?, motif_sortie=?
        WHERE id=?`,
       [
         student.matricule,
@@ -757,11 +836,108 @@ ipcMain.handle('students:update', (event, student) => {
         student.adresse || null,
         photoFileName,
         student.date_inscription || null,
+        student.actif === undefined || student.actif === null ? 1 : student.actif ? 1 : 0,
+        student.date_sortie || null,
+        student.motif_sortie || null,
         student.id
       ]
     );
     saveDbToDisk();
     return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+/** Journalise un événement dans l'historique de l'élève. */
+function logHistorique(studentId, evenement, motif, detail) {
+  db.run(
+    'INSERT INTO historique_eleves (student_id, evenement, date_evenement, motif, detail) VALUES (?, ?, ?, ?, ?)',
+    [studentId, evenement, formatTodayDDMMYYYY(), motif || null, detail || null]
+  );
+}
+
+/**
+ * Met un élève en congé (il quitte l'établissement) ou le réactive.
+ *
+ * On ne supprime jamais ses paiements : l'« impayé » de mars doit continuer
+ * d'exister dans l'historique même après son départ. Seul l'affichage change.
+ */
+ipcMain.handle('students:basculerActif', (event, payload) => {
+  try {
+    const p = payload || {};
+    const id = parseInt(p.student_id, 10);
+    if (!id) return { success: false, error: 'Élève introuvable' };
+    const eleve = query('SELECT id, nom, prenom, COALESCE(actif,1) AS actif FROM students WHERE id = ?', [id])[0];
+    if (!eleve) return { success: false, error: 'Élève introuvable' };
+
+    if (p.actif) {
+      db.run("UPDATE students SET actif = 1, date_sortie = NULL, motif_sortie = NULL WHERE id = ?", [id]);
+      logHistorique(id, 'retour', p.motif || null, 'Réinscription de l\'élève');
+    } else {
+      db.run('UPDATE students SET actif = 0, date_sortie = ?, motif_sortie = ? WHERE id = ?', [
+        p.date_sortie || formatTodayDDMMYYYY(),
+        p.motif || null,
+        id
+      ]);
+      logHistorique(id, 'depart', p.motif || null, p.date_sortie || formatTodayDDMMYYYY());
+    }
+    saveDbToDisk();
+    return { success: true, actif: p.actif ? 1 : 0 };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+/** Historique d'un élève : départs, retours, et son solde. */
+ipcMain.handle('students:historique', (event, studentId) => {
+  const id = parseInt(studentId, 10);
+  if (!id) return null;
+  const eleve = query('SELECT * FROM students WHERE id = ?', [id])[0];
+  if (!eleve) return null;
+
+  const anneeCourante = new Date().getFullYear();
+  const impayes = query(
+    'SELECT COUNT(*) c FROM paiements WHERE student_id = ? AND paye = 0 AND annee = ?',
+    [id, anneeCourante]
+  )[0].c;
+
+  return {
+    eleve: { ...eleve, actif: eleve.actif === null || eleve.actif === undefined ? 1 : Number(eleve.actif) },
+    evenements: query(
+      'SELECT evenement, date_evenement, motif, detail, created_at FROM historique_eleves WHERE student_id = ? ORDER BY id DESC',
+      [id]
+    ),
+    impayes_annee: Number(impayes) || 0
+  };
+});
+
+/**
+ * Remet à zéro l'historique de paiement d'un élève : ses abonnements repartent
+ * de zéro. Utilisable quand il revient après une absence, ou pour un cleans
+ * after un changement de tarification.
+ */
+ipcMain.handle('students:reinitialiser', (event, payload) => {
+  try {
+    const p = payload || {};
+    const id = parseInt(p.student_id, 10);
+    const annee = p.annee ? parseInt(p.annee, 10) : new Date().getFullYear();
+    const scope = p.scope === 'annee' ? 'annee' : 'tout';
+    if (!id) return { success: false, error: 'Élève introuvable' };
+
+    let supprimees = 0;
+    if (scope === 'annee') {
+      supprimees =
+        query('SELECT COUNT(*) c FROM paiements WHERE student_id = ? AND annee = ?', [id, annee])[0].c || 0;
+      db.run('DELETE FROM paiements WHERE student_id = ? AND annee = ?', [id, annee]);
+      logHistorique(id, 'reinitialisation', p.motif || null, 'Remise à zéro des abonnements ' + annee);
+    } else {
+      supprimees = query('SELECT COUNT(*) c FROM paiements WHERE student_id = ?', [id])[0].c || 0;
+      db.run('DELETE FROM paiements WHERE student_id = ?', [id]);
+      logHistorique(id, 'reinitialisation', p.motif || null, 'Remise à zéro de tous les paiements');
+    }
+    saveDbToDisk();
+    return { success: true, supprimees: Number(supprimees) || 0 };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -1411,7 +1587,7 @@ ipcMain.handle('paiements:grid', (event, params) => {
     `SELECT s.id, s.matricule, s.nom, s.prenom, s.classe, s.telephone_parent, s.date_inscription
      FROM student_matieres sm
      JOIN students s ON s.id = sm.student_id
-     WHERE sm.matiere_id = ? AND sm.teacher_id = ?
+     WHERE sm.matiere_id = ? AND sm.teacher_id = ? AND COALESCE(s.actif, 1) = 1
      ORDER BY s.nom COLLATE NOCASE ASC, s.prenom COLLATE NOCASE ASC`,
     [matiereId, teacherId]
   );
@@ -1882,36 +2058,63 @@ ipcMain.handle('annee:definir', (event, annee) => {
  * professeur. Alimente la colonne « Statut » de la liste et permet d'ouvrir la
  * grille annuelle d'un élève en un clic.
  */
+/**
+ * État de paiement des élèves, professeur par professeur.
+ *
+ * Périmètre en cascade : matière seule, matière + enseignant, ou aucun des
+ * deux (= tous les cours). Un mois vide = on compte TOUS les mois de l'année :
+ * l'élève est signalé dès qu'il a au moins un mois impayé.
+ */
 ipcMain.handle('paiements:etatEleves', (event, params) => {
   const p = params || {};
   const matiereId = p.matiere_id ? parseInt(p.matiere_id, 10) : null;
+  const teacherId = p.teacher_id ? parseInt(p.teacher_id, 10) : null;
   const annee = p.annee ? parseInt(p.annee, 10) : new Date().getFullYear();
-  const mois = p.mois ? parseInt(p.mois, 10) : null;
-  if (!matiereId || !mois) return {};
+
+  const valeurs = [annee];
+  let perimetre = '';
+  if (matiereId) {
+    perimetre += ' AND sm.matiere_id = ?';
+    valeurs.push(matiereId);
+  }
+  if (teacherId) {
+    perimetre += ' AND sm.teacher_id = ?';
+    valeurs.push(teacherId);
+  }
 
   const rows = query(
-    `SELECT sm.student_id, sm.teacher_id, t.nom AS teacher_nom, t.prenom AS teacher_prenom,
-            COALESCE(py.paye, 0) AS paye, py.montant, py.date_paiement
+    `SELECT sm.student_id, sm.matiere_id, sm.teacher_id, m.nom AS matiere_nom,
+            t.nom AS teacher_nom, t.prenom AS teacher_prenom,
+            SUM(CASE WHEN py.paye = 0 THEN 1 ELSE 0 END) AS impayes,
+            SUM(CASE WHEN py.paye = 1 THEN 1 ELSE 0 END) AS payes,
+            COALESCE(SUM(CASE WHEN py.paye = 0 THEN COALESCE(py.montant, 0) ELSE 0 END), 0) AS montant_du
      FROM student_matieres sm
      JOIN students s ON s.id = sm.student_id
+     JOIN matieres m ON m.id = sm.matiere_id
      LEFT JOIN teachers t ON t.id = sm.teacher_id
      LEFT JOIN paiements py
        ON py.student_id = sm.student_id AND py.matiere_id = sm.matiere_id
-      AND py.teacher_id IS sm.teacher_id AND py.annee = ? AND py.mois = ?
-     WHERE sm.matiere_id = ?
+      AND py.teacher_id IS sm.teacher_id AND py.annee = ?
+     WHERE COALESCE(s.actif, 1) = 1${perimetre}
+     GROUP BY sm.student_id, sm.matiere_id, sm.teacher_id
      ORDER BY s.nom COLLATE NOCASE ASC, s.prenom COLLATE NOCASE ASC`,
-    [annee, mois, matiereId]
+    valeurs
   );
 
   const map = {};
   rows.forEach((r) => {
     if (!map[r.student_id]) map[r.student_id] = [];
+    const prof = teacherFullName({ nom: r.teacher_nom, prenom: r.teacher_prenom }) || 'Sans professeur';
     map[r.student_id].push({
       teacher_id: r.teacher_id,
-      teacher_nom: teacherFullName({ nom: r.teacher_nom, prenom: r.teacher_prenom }) || 'Sans professeur',
-      paye: !!r.paye,
-      montant: Number(r.montant) || 0,
-      date_paiement: r.date_paiement || ''
+      matiere_id: r.matiere_id,
+      matiere_nom: cleanMatiereName(r.matiere_nom),
+      teacher_nom: prof,
+      libelle: prof ? `${cleanMatiereName(r.matiere_nom)} · ${prof}` : cleanMatiereName(r.matiere_nom),
+      paye: Number(r.impayes) === 0,
+      impayes: Number(r.impayes) || 0,
+      payes: Number(r.payes) || 0,
+      montant_du: Number(r.montant_du) || 0
     });
   });
   return map;

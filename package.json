@@ -18,7 +18,8 @@
     "build:css": "tailwindcss -i src/design-system.css -o src/generated.css --minify",
     "watch": "tailwindcss -i src/design-system.css -o src/generated.css --watch",
     "test:splash": "electron splash-check.js",
-    "test:fiche": "electron fiche-check.js"
+    "test:fiche": "electron fiche-check.js",
+    "test:impaye": "electron impaye-test.js"
   },
   "author": "",
   "license": "ISC",

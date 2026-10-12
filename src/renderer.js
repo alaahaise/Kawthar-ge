@@ -122,7 +122,9 @@
     graduationCap: svg('<path d="M2.5 8.5 12 4l9.5 4.5L12 13z"/><path d="M6.5 10.8V16c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5.2"/>'),
     pin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>',
     chart: svg('<path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 17v-5M12.5 17V8M17 17v-7"/>'),
-    warning: svg('<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/>')
+    warning: svg('<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/>'),
+    warn: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/>'),
+    history: svg('<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4.5h4.5"/><path d="M12 7.5V12l3 2"/>')
   };
 
   /** Remplit tous les <span data-icon="..."> du document. */
@@ -1043,10 +1045,13 @@
     'filter-classe-etudiants',
     'filter-matiere-etudiants',
     'filter-teacher-etudiants',
-    'filter-date-field',
-    'filter-date-from',
-    'filter-date-to',
+    'filter-date-inscription-from',
+    'filter-date-inscription-to',
+    'filter-date-naissance-from',
+    'filter-date-naissance-to',
+    'filter-actif',
     'statut-matiere',
+    'statut-teacher',
     'statut-mois',
     'statut-annee',
     'statut-etat'
@@ -1060,29 +1065,33 @@
       classe: $('#filter-classe-etudiants').value,
       matiere_id: $('#filter-matiere-etudiants').value,
       teacher_id: $('#filter-teacher-etudiants').value,
-      date_field: $('#filter-date-field').value,
-      date_from: $('#filter-date-from').value,
-      date_to: $('#filter-date-to').value,
+      // Deux plages indépendantes : une par date. Aucun menu « champ date ».
+      date_inscription_from: $('#filter-date-inscription-from').value,
+      date_inscription_to: $('#filter-date-inscription-to').value,
+      date_naissance_from: $('#filter-date-naissance-from').value,
+      date_naissance_to: $('#filter-date-naissance-to').value,
+      actif: $('#filter-actif').value,
       paiement_matiere: $('#statut-matiere').value,
+      paiement_teacher: $('#statut-teacher').value,
       paiement_mois: $('#statut-mois').value,
       paiement_annee: $('#statut-annee').value,
       statut: $('#statut-etat').value
     };
   }
 
-  /** Recharge la colonne « Statut » (par professeur, pour la matière/mois choisis). */
+  /**
+ * Colonne « Statut » : un jeton par professeur.
+ *
+ * Elle suit le même périmètre en cascade que le filtre — sans matière, on
+ * montre l'état de TOUS les cours de l'élève ; avec une matière et un
+ * enseignant, seulement ce cours.
+ */
   async function refreshStatutPaiement() {
-    const matiereId = $('#statut-matiere').value;
-    const mois = $('#statut-mois').value;
-    const annee = $('#statut-annee').value;
-    if (!matiereId || !mois) {
-      mapStatutPaiement = {};
-      return;
-    }
+    const annee = $('#statut-annee').value || anneeTravail;
     mapStatutPaiement = await window.api.paiementsEtatEleves({
-      matiere_id: matiereId,
-      annee: annee || anneeTravail,
-      mois
+      matiere_id: $('#statut-matiere').value || '',
+      teacher_id: $('#statut-teacher').value || '',
+      annee
     });
   }
 
@@ -1133,6 +1142,9 @@
         <td>${escapeHtml(s.telephone_parent || '—')}</td>
         <td class="actions-cell">
           <button class="btn-icon" data-fiche="${s.id}" title="Cours et paiements de cet élève">${ICONS.wallet}</button>
+          <button class="btn-icon" data-toggle="${s.id}" data-actif="${s.actif === 0 ? 0 : 1}"
+            title="${s.actif === 0 ? 'Réactiver cet élève' : 'Mettre cet élève en congé'}">${s.actif === 0 ? ICONS.check : ICONS.warn}</button>
+          <button class="btn-icon" data-historique="${s.id}" title="Voir l'historique de l'élève">${ICONS.history}</button>
           <button class="btn-icon" data-edit="${s.id}" title="Modifier">${ICONS.edit}</button>
           <button class="btn-icon" data-card="${s.id}" title="Voir la carte">${ICONS.idcard}</button>
           <button class="btn-icon is-danger" data-del="${s.id}" title="Supprimer">${ICONS.trash}</button>
@@ -1153,6 +1165,12 @@
     );
     tbody.querySelectorAll('[data-del]').forEach((b) =>
       b.addEventListener('click', () => askDeleteStudent(parseInt(b.dataset.del, 10)))
+    );
+    tbody.querySelectorAll('[data-toggle]').forEach((b) =>
+      b.addEventListener('click', () => basculerEleve(parseInt(b.dataset.toggle, 10), parseInt(b.dataset.actif, 10)))
+    );
+    tbody.querySelectorAll('[data-historique]').forEach((b) =>
+      b.addEventListener('click', () => openHistoriqueEleve(parseInt(b.dataset.historique, 10)))
     );
 
     // --- Clic sur le prénom : on entre dans la fiche de l'élève ---
@@ -1183,13 +1201,20 @@
 
   function renderStatutCell(studentId) {
     const etats = mapStatutPaiement[studentId] || [];
-    if (!etats.length) return '<span class="hint-inline">choisir une matière et un mois</span>';
+    if (!etats.length) {
+      // Le périmètre peut exclure cet élève (matière ou prof choisi) sans
+      // qu'il ne suive aucun cours : le libellé doit le dire.
+      const filtre = $('#statut-matiere').value || $('#statut-teacher').value;
+      return `<span class="hint-inline">${filtre ? 'hors du périmètre choisi' : 'aucun cours suivi'}</span>`;
+    }
     return `<div class="statut-cell">${etats
       .map(
         (e) => `<button class="statut-pill ${e.paye ? 'is-paye' : 'is-impaye'}"
           data-statut-student="${studentId}" data-statut-teacher="${e.teacher_id}"
-          title="${e.paye ? 'Payé — voir le détail' : 'Impayé — voir le détail'}">
-          ${e.paye ? '✓' : '✕'} ${escapeHtml(e.teacher_nom)}
+          data-statut-matiere="${e.matiere_id}"
+          title="${e.paye ? `${e.payes} mois réglés — voir le détail` : `${e.impayes} impayé(s) · ${formatAmount(e.montant_du)} DA — voir le détail`}">
+          ${e.paye ? '✓' : '✕'} ${escapeHtml(e.libelle || e.teacher_nom)}
+          ${e.impayes > 0 ? `<span class="statut-count">${e.impayes}</span>` : ''}
         </button>`
       )
       .join('')}</div>`;
@@ -1204,20 +1229,27 @@
       nom: 'Nom',
       prenom: 'Prénom',
       classe: 'Classe',
-      matiere_id: 'Matière',
+      matiere_id: 'Matière suivie',
       teacher_id: 'Enseignant',
-      date_from: 'Date (depuis)',
-      date_to: 'Date (jusqu\'au)',
-      paiement_matiere: 'Matière (statut)',
+      date_inscription_from: 'Inscription du',
+      date_inscription_to: 'Inscription au',
+      date_naissance_from: 'Naissance du',
+      date_naissance_to: 'Naissance au',
+      paiement_matiere: 'Matière',
+      paiement_teacher: 'Enseignant',
       paiement_mois: 'Mois',
       paiement_annee: 'Année',
       statut: 'Paiement'
     };
     const active = [];
     Object.keys(labels).forEach((k) => {
+      // « Présents uniquement » est le défaut : inutile de l'annoncer.
+      if (k === 'actif' && f[k] === '1') return;
       if (f[k]) {
         const valeur = k === 'statut' ? (f[k] === 'impaye' ? 'Impayés' : 'Payés') : f[k];
-        active.push(`${labels[k]} : ${escapeHtml(valeur)}`);
+        const nom =
+          k === 'actif' ? (f[k] === '0' ? 'Présents et partis' : 'Partis seulement') : labels[k];
+        active.push(`${nom} : ${escapeHtml(valeur)}`);
       }
     });
     hint.innerHTML = active.length ? 'Filtres actifs — ' + active.join(' · ') : '';
@@ -1253,7 +1285,7 @@
     ['#filter-matiere-etudiants', '#statut-matiere', '#filter-matiere-cartes'].forEach((sel) => {
       const el = $(sel);
       if (el) {
-        el.innerHTML = sel === '#statut-matiere' ? `<option value="">-- matière --</option>${matieres}` : `<option value="">Toutes les matières</option>${matieres}`;
+        el.innerHTML = `<option value="">Toutes les matières</option>${matieres}`;
       }
     });
 
@@ -1280,6 +1312,31 @@
       cours.map((c) => `<option value="${c.teacher_id}">${escapeHtml(c.teacher_full_name)}</option>`).join('');
   }
 
+  /**
+   * Cascade du filtre d'état : choisir une matière restreint la liste des
+   * enseignants à ceux qui l'assurent. Sans matière, tous sont proposés.
+   */
+  function refreshStatutTeacherOptions() {
+    const profSel = $('#statut-teacher');
+    if (!profSel) return;
+    const matiereId = $('#statut-matiere').value;
+    const profs = matiereId
+      ? [...new Set(allCours.filter((c) => String(c.matiere_id) === matiereId).map((c) => c.teacher_id))]
+      : allTeachers.map((t) => t.id);
+
+    const courant = profSel.value;
+    profSel.innerHTML =
+      '<option value="">Tous les enseignants</option>' +
+      profs
+        .map((id) => {
+          const t = allTeachers.find((x) => String(x.id) === String(id));
+          return `<option value="${id}">${escapeHtml(t ? teacherLabel(t) : 'Enseignant ' + id)}</option>`;
+        })
+        .join('');
+    // On ne conserve le choix que s'il est encore valide dans le nouveau périmètre.
+    profSel.value = profs.some((id) => String(id) === courant) ? courant : '';
+  }
+
   let searchDebounce = null;
   function onFilterChanged(immediate) {
     if (searchDebounce) clearTimeout(searchDebounce);
@@ -1295,6 +1352,20 @@
     const evt = el.tagName === 'SELECT' || el.type === 'date' ? 'change' : 'input';
     el.addEventListener(evt, () => onFilterChanged());
   });
+
+  // Masque de saisie sur les quatre champs de date.
+  ['#filter-date-inscription-from', '#filter-date-inscription-to', '#filter-date-naissance-from', '#filter-date-naissance-to'].forEach(
+    (sel) => attachDateMask($(sel))
+  );
+
+  // Cascade du filtre d'état : la matière restreint les enseignants proposés.
+  const statutMatiere = $('#statut-matiere');
+  if (statutMatiere) {
+    statutMatiere.addEventListener('change', () => {
+      refreshStatutTeacherOptions();
+      onFilterChanged(true);
+    });
+  }
 
   $('#btn-reset-students-filters').addEventListener('click', () => {
     STUDENT_FILTER_IDS.forEach((id) => {
@@ -1523,6 +1594,103 @@
 
   $('#btn-close-grille-eleve').addEventListener('click', fermerGrilleEleve);
   $('#btn-close-grille-eleve-2').addEventListener('click', fermerGrilleEleve);
+
+  // ============================================================
+  //  CONGÉ / RETOUR / HISTORIQUE D'UN ÉLÈVE
+  // ============================================================
+  // Un élève qui quitte l'établissement n'est pas effacé : ses paiements
+  // passés doivent rester auditables. On le met en congé, il disparaît des
+  // listes actives et des grilles, et il peut revenir plus tard.
+
+  let toggleCible = null;
+
+  async function basculerEleve(studentId, actif) {
+    const s = allStudentsCache.find((x) => x.id === studentId);
+    if (!s) return;
+    toggleCible = { id: studentId, actif };
+
+    const revenir = actif === 0;
+    $('#toggle-modal-title').textContent = revenir
+      ? `Réactiver ${s.prenom} ${s.nom}`
+      : `Mettre ${s.prenom} ${s.nom} en congé`;
+    $('#toggle-explication').textContent = revenir
+      ? "L'élève réapparaît dans les listes actives et dans les grilles de paiement. Son historique est conservé."
+      : "L'élève disparaît des listes actives et des grilles. Ses paiements passés restent conservés et il pourra revenir plus tard.";
+    $('#toggle-motif').value = '';
+    $('#toggle-modal-overlay').classList.add('active');
+  }
+
+  $('#btn-close-toggle').addEventListener('click', () => $('#toggle-modal-overlay').classList.remove('active'));
+  $('#btn-cancel-toggle').addEventListener('click', () => $('#toggle-modal-overlay').classList.remove('active'));
+  $('#btn-confirm-toggle').addEventListener('click', async () => {
+    if (!toggleCible) return;
+    const motif = $('#toggle-motif').value.trim();
+    await window.api.basculerEleveActif({ student_id: toggleCible.id, actif: toggleCible.actif, motif });
+    $('#toggle-modal-overlay').classList.remove('active');
+    toggleCible = null;
+    await refreshStudentList();
+    await refreshStats();
+  });
+
+  async function openHistoriqueEleve(studentId) {
+    const h = await window.api.historiqueEleve(studentId);
+    if (!h) return;
+    historiqueCible = studentId;
+    const e = h.eleve;
+
+    $('#history-modal-title').textContent = `${e.prenom} ${e.nom} — historique`;
+    $('#history-modal-body').innerHTML = `
+      <div class="detail-grid">
+        <div class="detail-item"><span>Matricule</span><b>${escapeHtml(e.matricule)}</b></div>
+        <div class="detail-item"><span>Statut</span><b class="${e.actif ? 'is-ok' : 'is-warn'}">${e.actif ? 'présent' : 'en congé'}</b></div>
+        <div class="detail-item"><span>Date d'inscription</span><b>${escapeHtml(e.date_inscription || '—')}</b></div>
+        <div class="detail-item"><span>Date de sortie</span><b>${escapeHtml(e.date_sortie || '—')}</b></div>
+        <div class="detail-item"><span>Motif</span><b>${escapeHtml(e.motif_sortie || '—')}</b></div>
+        <div class="detail-item"><span>Impayés ${new Date().getFullYear()}</span><b class="${h.impayes_annee > 0 ? 'is-warn' : 'is-ok'}">${h.impayes_annee} mois</b></div>
+      </div>
+
+      <h3 class="detail-h3">Événements</h3>
+      ${
+        h.evenements.length
+          ? `<table class="mini-table">
+              <thead><tr><th>Date</th><th>Événement</th><th>Motif</th></tr></thead>
+              <tbody>${h.evenements
+                .map(
+                  (ev) => `<tr>
+                    <td>${escapeHtml(ev.date_evenement || '')}</td>
+                    <td>${escapeHtml(ev.evenement)}</td>
+                    <td>${escapeHtml(ev.motif || '—')}</td>
+                  </tr>`
+                )
+                .join('')}</tbody>
+            </table>`
+          : '<p class="empty-inline">Aucun événement enregistré.</p>'
+      }
+
+      <p class="hint-inline">La réinitialisation supprime les paiements enregistrés : les abonnements repartent de zéro. À utiliser quand l'élève revient après une absence.</p>`;
+
+    $('#history-modal-overlay').classList.add('active');
+  }
+
+  let historiqueCible = null;
+
+  $('#btn-close-history').addEventListener('click', () => $('#history-modal-overlay').classList.remove('active'));
+  $('#btn-cancel-history').addEventListener('click', () => $('#history-modal-overlay').classList.remove('active'));
+
+  $('#btn-reset-history').addEventListener('click', async () => {
+    if (!historiqueCible) return;
+    const annee = $('#statut-annee').value || anneeTravail;
+    if (!confirm(`Supprimer tous les paiements enregistrés de cet élève pour ${annee} ?\n\nSes abonnements repartiront de zéro.`)) return;
+    const res = await window.api.reinitialiserEleve({ student_id: historiqueCible, annee, scope: 'annee' });
+    if (res.success) {
+      $('#history-modal-overlay').classList.remove('active');
+      await refreshStudentList();
+      await refreshStats();
+      await openHistoriqueEleve(historiqueCible);
+    } else {
+      alert(res.error || 'Réinitialisation impossible.');
+    }
+  });
 
   // ============================================================
   //  SUPPRESSION D'UN ÉLÈVE
@@ -2051,8 +2219,10 @@
     moisSel.value = String(payState.mois);
 
     if (statutMois) {
+      // Mois vide = on cherche sur TOUS les mois de l'année.
       statutMois.innerHTML =
-        '<option value="">-- mois --</option>' + MOIS_LONGS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+        '<option value="">-- tous les mois --</option>' +
+        MOIS_LONGS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
     }
   }
 
@@ -2344,6 +2514,7 @@
     fillDashAnneeSelect();
     populateDashTeacherSelect();
     populateFilterSelects();
+    refreshStatutTeacherOptions();
     refreshPayFilters();
     renderMatieresView();
     renderTeachersView();

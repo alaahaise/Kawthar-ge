@@ -276,30 +276,45 @@
 
             <div class="filters-row">
               <div class="filter-field">
-                <label>Champ date</label>
-                <select id="filter-date-field">
-                  <option value="date_inscription">Date d'inscription</option>
-                  <option value="date_naissance">Date de naissance</option>
+                <label>Date d'inscription</label>
+                <input type="text" id="filter-date-inscription-from" placeholder="du — jj/mm/aaaa" maxlength="10" />
+              </div>
+              <div class="filter-field">
+                <label>&nbsp;</label>
+                <input type="text" id="filter-date-inscription-to" placeholder="au — jj/mm/aaaa" maxlength="10" />
+              </div>
+              <div class="filter-field">
+                <label>Date de naissance</label>
+                <input type="text" id="filter-date-naissance-from" placeholder="du — jj/mm/aaaa" maxlength="10" />
+              </div>
+              <div class="filter-field">
+                <label>&nbsp;</label>
+                <input type="text" id="filter-date-naissance-to" placeholder="au — jj/mm/aaaa" maxlength="10" />
+              </div>
+              <div class="filter-field">
+                <label>Élèves</label>
+                <select id="filter-actif">
+                  <option value="1">Présents uniquement</option>
+                  <option value="0">Tous (présents et partis)</option>
+                  <option value="2">Partis uniquement</option>
                 </select>
               </div>
-              <div class="filter-field">
-                <label>Du</label>
-                <input type="text" id="filter-date-from" placeholder="jj/mm/aaaa" maxlength="10" />
-              </div>
-              <div class="filter-field">
-                <label>Au</label>
-                <input type="text" id="filter-date-to" placeholder="jj/mm/aaaa" maxlength="10" />
-              </div>
+            </div>
+
+            <div class="filters-row">
               <div class="filter-field filter-field-wide">
-                <label>État du paiement — pour cette matière et ce mois</label>
+                <label>État du paiement — sans mois, on cherche sur tous les mois</label>
                 <div class="inline-filters">
                   <select id="statut-matiere">
-                    <option value="">-- matière --</option>
+                    <option value="">Toutes les matières</option>
                   </select>
-                  <select id="statut-mois">
-                    <option value="">-- mois --</option>
+                  <select id="statut-teacher">
+                    <option value="">Tous les enseignants</option>
                   </select>
                   <select id="statut-annee"></select>
+                  <select id="statut-mois">
+                    <option value="">-- tous les mois --</option>
+                  </select>
                   <select id="statut-etat">
                     <option value="">Tous les élèves</option>
                     <option value="impaye">Impayés seulement</option>
@@ -716,6 +731,45 @@
 </div>
 
 <!-- Matière detail modal (inscrits + paiements) -->
+<!-- Congé / retour d'un élève -->
+<div class="modal-overlay" id="toggle-modal-overlay">
+  <div class="modal modal-small">
+    <div class="modal-header">
+      <h2 id="toggle-modal-title">Élève</h2>
+      <button class="btn-close" id="btn-close-toggle" data-icon="close"></button>
+    </div>
+    <div class="modal-body modal-body-col">
+      <p id="toggle-explication" class="hint-inline"></p>
+      <label class="pf-field">
+        <span class="pf-label">Motif <span class="hint-inline">(facultatif)</span></span>
+        <span class="pf-input">
+          <span class="pf-icon" data-icon="clipboard"></span>
+          <input type="text" id="toggle-motif" placeholder="Déménagement, fin d'année…" />
+        </span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-light" id="btn-cancel-toggle">Annuler</button>
+      <button class="btn btn-primary" id="btn-confirm-toggle">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Historique d'un élève -->
+<div class="modal-overlay" id="history-modal-overlay">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="history-modal-title">Historique de l'élève</h2>
+      <button class="btn-close" id="btn-close-history" data-icon="close"></button>
+    </div>
+    <div class="modal-body modal-body-col" id="history-modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-light" id="btn-cancel-history">Fermer</button>
+      <button class="btn btn-danger" id="btn-reset-history">Réinitialiser l'historique</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="grille-eleve-overlay">
   <div class="modal modal-wide">
     <div class="modal-header">

@@ -45,8 +45,9 @@ app.whenReady().then(async () => {
         selections: [{ matiere_id: m.id, teacher_ids: [t1.id] }],
         date_inscription: '05/10/2026'
       });
-      // Amine a payé chez Karim en mars, pas chez Rachid.
-      await api.togglePayment({ student_id: s1.id, matiere_id: m.id, teacher_id: t1.id, annee: 2026, mois: 3, paye: true });
+      // Amine a payé chez Karim en octobre (mois >= son inscription du 15/09),
+      // mais n'a rien réglé chez Rachid.
+      await api.togglePayment({ student_id: s1.id, matiere_id: m.id, teacher_id: t1.id, annee: 2026, mois: 10, paye: true });
     });
 
     // ---- Année de travail ----
@@ -90,12 +91,27 @@ app.whenReady().then(async () => {
       const t2 = (await api.listTeachers()).find((x) => x.nom === 'Meziane');
       const m = (await api.listMatieres())[0];
       const s = {};
-      s.map = await api.paiementsEtatEleves({ matiere_id: m.id, annee: 2026, mois: 3 });
+      s.map = await api.paiementsEtatEleves({ matiere_id: m.id, annee: 2026 });
       const amine = Object.entries(s.map).find(([, v]) => v.length === 2);
       s.payes = await api.listStudents({
-        paiement_matiere: m.id, paiement_mois: 3, paiement_annee: 2026, statut: 'paye'
+        paiement_matiere: m.id, paiement_mois: 10, paiement_annee: 2026, statut: 'paye'
       });
       s.impayes = await api.listStudents({
+        paiement_matiere: m.id, paiement_mois: 10, paiement_annee: 2026, statut: 'impaye'
+      });
+      // Sans mois : on cherche sur tous les mois de l'année.
+      s.impayesTousMois = await api.listStudents({
+        paiement_matiere: m.id, paiement_annee: 2026, statut: 'impaye'
+      });
+      // Cible d'un seul professeur.
+      s.impayesKarim = await api.listStudents({
+        paiement_matiere: m.id, paiement_teacher: t1.id, paiement_annee: 2026, statut: 'impaye'
+      });
+      s.impayesRachid = await api.listStudents({
+        paiement_matiere: m.id, paiement_teacher: t2.id, paiement_annee: 2026, statut: 'impaye'
+      });
+      // Un mois antérieur à l'inscription n'est jamais dû.
+      s.avantInsc = await api.listStudents({
         paiement_matiere: m.id, paiement_mois: 3, paiement_annee: 2026, statut: 'impaye'
       });
       s.noms = (await api.listStudents()).map((x) => x.nom);
@@ -105,10 +121,18 @@ app.whenReady().then(async () => {
     });
     // Amine est payé chez Karim et impayé chez Rachid => présent dans les deux listes.
     ck('état : deux professeurs pour Amine', etat.map[Object.keys(etat.map)[0]].length === 2, etat.map);
-    ck('filtre "payés" : Amine présent (il a payé chez Karim)', etat.payes.some((x) => x.nom === 'Bouzid'), etat.payes.map((x) => x.nom));
+    ck('filtre "payés" : Amine présent (il a payé chez Karim en octobre)', etat.payes.some((x) => x.nom === 'Bouzid'), etat.payes.map((x) => x.nom));
     ck('filtre "payés" : Yanis absent', !etat.payes.some((x) => x.nom === 'Cherif'), etat.payes.map((x) => x.nom));
     ck('filtre "impayés" : Yanis présent', etat.impayes.some((x) => x.nom === 'Cherif'), etat.impayes.map((x) => x.nom));
     ck('filtre "impayés" : Amine présent (impayé chez Rachid)', etat.impayes.some((x) => x.nom === 'Bouzid'), etat.impayes.map((x) => x.nom));
+
+    ck('sans mois : les deux élèves sont impayés', etat.impayesTousMois.length === 2, etat.impayesTousMois.map((x) => x.nom));
+    // Amine a réglé octobre chez Karim, mais septembre reste dû : il est donc
+    // bien impayé chez Karim, pour septembre.
+    ck('cible prof Karim : Amine présent (septembre impayé)', etat.impayesKarim.some((x) => x.nom === 'Bouzid'), etat.impayesKarim.map((x) => x.nom));
+    ck('cible prof Karim : Yanis impayé, présent', etat.impayesKarim.some((x) => x.nom === 'Cherif'), etat.impayesKarim.map((x) => x.nom));
+    ck('cible prof Rachid : Amine impayé, présent', etat.impayesRachid.some((x) => x.nom === 'Bouzid'), etat.impayesRachid.map((x) => x.nom));
+    ck('mars < inscription : personne impayé', etat.avantInsc.length === 0, etat.avantInsc.map((x) => x.nom));
 
     // ---- Grille annuelle d'un élève ----
     const grille = await r(async function grille() {
@@ -119,10 +143,21 @@ app.whenReady().then(async () => {
       const g = await api.paiementsGrilleEleve({
         student_id: amine.id, matiere_id: m.id, teacher_id: t1.id, annee: 2026
       });
-      return { mois: g.mois.length, mars: g.mois[2].paye, montant: g.mois[2].montant, prix: g.prix, prof: g.cours.teacher_full_name, nom: g.etudiant.nom };
+      return {
+        mois: g.mois.length,
+        octobre: g.mois[9].paye,
+        septembre: g.mois[8].statut,
+        aout: g.mois[7].statut,
+        montant: g.mois[9].montant,
+        prix: g.prix,
+        prof: g.cours.teacher_full_name,
+        nom: g.etudiant.nom
+      };
     });
+    ck('grille élève : octobre payé', grille.octobre === true, grille.octobre);
+    ck('grille élève : septembre impayé (postérieur à l\'inscription)', grille.septembre === 'impaye', grille.septembre);
+    ck('grille élève : août avant l\'inscription', grille.aout === 'hors-periode', grille.aout);
     ck('grille élève : 12 mois', grille.mois === 12, grille.mois);
-    ck('grille élève : mars payé', grille.mars === true);
     ck('grille élève : montant = tarif du prof', grille.montant === 2000, grille.montant);
     ck('grille élève : professeur correct', grille.prof === 'Karim Benali', grille.prof);
     ck('grille élève : bon élève', grille.nom === 'Bouzid', grille.nom);
