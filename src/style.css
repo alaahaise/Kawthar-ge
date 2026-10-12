@@ -1195,6 +1195,125 @@ tbody tr:hover { background: #fafcff; }
 .year-banner-text { font-size: 13px; color: var(--ink); line-height: 1.5; flex: 1; }
 .year-banner .btn { flex-shrink: 0; }
 
+/* ---------- SÉLECTION D'UN COURS DANS LA FICHE ÉLÈVE ---------- */
+.cours-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cours-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-line);
+  border-radius: 11px;
+  background: var(--color-surface);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s var(--ease-out), border-color 0.12s var(--ease-out), transform 0.1s var(--ease-out);
+}
+.cours-pick:hover {
+  background: var(--color-brand-50);
+  transform: translateX(2px);
+}
+.cours-pick.is-impaye { border-left-color: var(--color-danger); }
+.cours-pick.is-paye { border-left-color: var(--color-success); }
+
+.cours-pick-icon { width: 20px; height: 20px; color: var(--color-brand-500); flex-shrink: 0; }
+.cours-pick-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.cours-pick-matiere { font-size: 13.5px; font-weight: 700; color: var(--color-ink); }
+.cours-pick-prof { font-size: 11.5px; color: var(--color-muted); font-weight: 600; }
+
+.cours-pick-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+.cours-pick-badge.is-ko { background: var(--color-danger-soft); color: var(--color-danger); }
+.cours-pick-badge.is-ok { background: var(--color-success-soft); color: #1f7a45; }
+
+/* ---------- EN-TÊTE DE LA GRILLE DES MOIS ---------- */
+.grille-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-line);
+  margin-bottom: 14px;
+}
+.grille-cours { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 180px; }
+.grille-matiere { font-size: 15px; font-weight: 800; color: var(--color-ink); }
+.grille-prof { font-size: 12px; color: var(--color-muted); font-weight: 600; }
+.grille-totaux { font-size: 12.5px; color: var(--color-muted); font-weight: 600; white-space: nowrap; }
+.grille-totaux b { color: var(--color-ink); }
+.grille-totaux .is-warn { color: var(--color-danger); font-weight: 800; }
+
+/* ---------- ONGLETS D'ANNÉE ---------- */
+.annee-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+
+.annee-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 92px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s var(--ease-out), background 0.12s var(--ease-out);
+}
+.annee-tab:hover { background: var(--color-brand-50); }
+.annee-tab-y { font-size: 13.5px; font-weight: 800; color: var(--color-ink); }
+.annee-tab-l { font-size: 10.5px; font-weight: 700; color: var(--color-muted); }
+.annee-tab.is-active { border-color: var(--color-brand-500); box-shadow: var(--shadow-focus); }
+.annee-tab.is-active .annee-tab-y { color: var(--color-brand-500); }
+.annee-tab.is-ok .annee-tab-l { color: #1f7a45; }
+.annee-tab.is-impaye .annee-tab-l { color: var(--color-danger); }
+
+/* ---------- LÉGENDE DE LA GRILLE ---------- */
+.grille-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 11.5px;
+  color: var(--color-muted);
+  font-weight: 600;
+  margin-top: 14px;
+}
+.grille-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.lg { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid var(--color-line); }
+.lg-paye { background: var(--color-success-soft); border-color: #b6e4c8; }
+.lg-impaye { background: var(--color-danger-soft); border-color: #f3c6bf; }
+.lg-avenir { background: var(--color-canvas-deep); }
+.lg-hors { background: repeating-linear-gradient(45deg, #eceff5, #eceff5 3px, #dde2ec 3px, #dde2ec 6px); }
+
+/* États « pas encore dû » et « avant l'inscription ». */
+.mois-cell.is-avenir { opacity: 0.5; cursor: not-allowed; background: var(--color-canvas-deep); }
+.mois-cell.is-hors-periode {
+  cursor: not-allowed;
+  background: repeating-linear-gradient(45deg, #eceff5, #eceff5 4px, #e2e7f0 4px, #e2e7f0 8px);
+  opacity: 0.75;
+}
+.mois-cell.is-hors-periode .mois-mark { color: var(--color-muted); }
+.mois-cell.is-impaye { border-color: #f3c6bf; }
+.mois-cell.is-impaye .mois-mark { color: var(--color-danger); }
+.mois-cell.is-impaye:hover { background: var(--color-danger-soft); }
+
+.is-warn { color: var(--color-danger); font-weight: 800; }
+.is-ok { color: #1f7a45; font-weight: 800; }
+
 /* ---------- APERÇU D'IMPORT EXCEL ---------- */
 .import-summary {
   display: flex;

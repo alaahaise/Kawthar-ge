@@ -17,7 +17,8 @@
     "screenshots": "electron screenshot.js",
     "build:css": "tailwindcss -i src/design-system.css -o src/generated.css --minify",
     "watch": "tailwindcss -i src/design-system.css -o src/generated.css --watch",
-    "test:splash": "electron splash-check.js"
+    "test:splash": "electron splash-check.js",
+    "test:fiche": "electron fiche-check.js"
   },
   "author": "",
   "license": "ISC",

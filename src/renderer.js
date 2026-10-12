@@ -1197,6 +1197,7 @@
         <td>${escapeHtml(s.date_inscription || '—')}</td>
         <td>${escapeHtml(s.telephone_parent || '—')}</td>
         <td class="actions-cell">
+          <button class="btn-icon" data-fiche="${s.id}" title="Cours et paiements de cet élève">${ICONS.wallet}</button>
           <button class="btn-icon" data-edit="${s.id}" title="Modifier">${ICONS.edit}</button>
           <button class="btn-icon" data-card="${s.id}" title="Voir la carte">${ICONS.idcard}</button>
           <button class="btn-icon is-danger" data-del="${s.id}" title="Supprimer">${ICONS.trash}</button>
@@ -1206,6 +1207,9 @@
       .join('');
 
     // --- Actions ---
+    tbody.querySelectorAll('[data-fiche]').forEach((b) =>
+      b.addEventListener('click', () => openFicheEleve(parseInt(b.dataset.fiche, 10)))
+    );
     tbody.querySelectorAll('[data-edit]').forEach((b) =>
       b.addEventListener('click', () => startEditStudent(parseInt(b.dataset.edit, 10)))
     );
@@ -1215,6 +1219,13 @@
     tbody.querySelectorAll('[data-del]').forEach((b) =>
       b.addEventListener('click', () => askDeleteStudent(parseInt(b.dataset.del, 10)))
     );
+
+    // --- Clic sur le prénom : on entre dans la fiche de l'élève ---
+    tbody.querySelectorAll('td:nth-child(4)').forEach((td) => {
+      td.style.cursor = 'pointer';
+      td.title = 'Ouvrir la fiche de cet élève';
+      td.addEventListener('click', () => openFicheEleve(parseInt(td.closest('tr').dataset.studentId, 10)));
+    });
 
     // --- Clic sur un jeton de statut : la grille de CE cours ---
     tbody.querySelectorAll('.statut-pill').forEach((pill) => {
@@ -1370,13 +1381,80 @@
   });
 
   // ============================================================
-  /**
-   * Grille annuelle d'un élève pour UN cours : c'est le clic sur « why is this
-   * student unpaid » — on ouvre son tableau des 12 mois, cliquable.
-   */
-  let grilleEleveData = null;
+// Parcours demandé : on entre dans l'élève, on voit les cours qu'il suit,
+  // on choisit un cours, on obtient le tableau des mois de CE cours.
 
-  async function openGrilleEleve(studentId, matiereId, teacherId, annee) {
+  // Vrai si la grille a ete ouverte depuis la fiche : la fermeture doit alors
+  // rendre la main a la fiche plutot que de tout fermer.
+  let grilleOuverteDepuisFiche = false;
+  let dernierEleveDeLaGrille = null;
+  let derniereAnneeDeLaGrille = null;
+
+  /** Ouvre la fiche d'un élève : identité + liste de ses cours. */
+  async function openFicheEleve(studentId, annee) {
+    const etudiant = allStudentsCache.find((s) => s.id === studentId);
+    if (!etudiant) return;
+
+    const cours = await window.api.paiementsCoursEleve(studentId);
+    const anneeCourante = new Date().getFullYear();
+    const impayesTotal = cours.reduce((s, c) => s + Number(c.annee_impayes || 0), 0);
+
+    openMatiereModal(
+      `${escapeHtml(etudiant.prenom)} ${escapeHtml(etudiant.nom)} — ${escapeHtml(etudiant.matricule)}`,
+      `
+      <div class="detail-grid">
+        <div class="detail-item"><span>Matricule</span><b>${escapeHtml(etudiant.matricule)}</b></div>
+        <div class="detail-item"><span>Classe</span><b>${escapeHtml(etudiant.classe || '—')}</b></div>
+        <div class="detail-item"><span>Date d'inscription</span><b>${escapeHtml(etudiant.date_inscription || '—')}</b></div>
+        <div class="detail-item"><span>Cours suivis</span><b>${cours.length}</b></div>
+        <div class="detail-item"><span>Téléphone parent</span><b>${escapeHtml(etudiant.telephone_parent || '—')}</b></div>
+        <div class="detail-item"><span>Impayés ${anneeCourante}</span><b class="${impayesTotal > 0 ? 'is-warn' : 'is-ok'}">${impayesTotal} mois</b></div>
+      </div>
+
+      <h3 class="detail-h3">Cours suivis — cliquez pour voir les mois</h3>
+      ${
+        cours.length
+          ? `<div class="cours-picker">
+              ${cours
+                .map(
+                  (c) => `<button class="cours-pick ${c.annee_impayes > 0 ? 'is-impaye' : 'is-paye'}"
+                    data-pick-matiere="${c.matiere_id}" data-pick-teacher="${c.teacher_id}" data-pick-annee="${annee || ''}">
+                    <span class="cours-pick-icon">${ICONS.book}</span>
+                    <span class="cours-pick-text">
+                      <span class="cours-pick-matiere">${escapeHtml(c.matiere_nom)}</span>
+                      <span class="cours-pick-prof">${escapeHtml(c.teacher_full_name)} · ${c.prix_mensuel ? formatAmount(c.prix_mensuel) + ' DA/mois' : 'prix non défini'}</span>
+                    </span>
+                    ${
+                      c.annee_impayes > 0
+                        ? `<span class="cours-pick-badge is-ko">${c.annee_impayes} impayé(s)</span>`
+                        : '<span class="cours-pick-badge is-ok">à jour</span>'
+                    }
+                  </button>`
+                )
+                .join('')}
+            </div>`
+          : '<p class="empty-inline">Cet élève ne suit aucun cours.</p>'
+      }`
+    );
+    $('#btn-print-matiere-report').style.display = 'none';
+
+    $('#matiere-modal-body')
+      .querySelectorAll('[data-pick-matiere]')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          openGrilleEleve(
+            studentId,
+            parseInt(btn.dataset.pickMatiere, 10),
+            parseInt(btn.dataset.pickTeacher, 10),
+            btn.dataset.pickAnnee ? parseInt(btn.dataset.pickAnnee, 10) : null,
+            true
+          );
+        });
+      });
+  }
+
+  /** Grille des mois d'un cours pour un élève, avec gestion des années. */
+  async function openGrilleEleve(studentId, matiereId, teacherId, annee, depuisFiche) {
     const data = await window.api.paiementsGrilleEleve({
       student_id: studentId,
       matiere_id: matiereId,
@@ -1384,41 +1462,91 @@
       annee
     });
     if (!data) return;
-    grilleEleveData = data;
 
-    const moisCourant = new Date().getFullYear() === data.annee ? new Date().getMonth() + 1 : 0;
-    const payes = data.mois.filter((m) => m.paye).length;
-    const total = data.mois.filter((m) => m.paye).reduce((s, m) => s + m.montant, 0);
+    // La grille est un palier plus profond que la fiche : on ferme la fiche,
+    // sinon elle reste empilee au-dessus et masque la grille. Le bouton
+    // « Retour aux cours » — et la fermeture — la rouvrent.
+    closeMatiereModal();
+    grilleOuverteDepuisFiche = !!depuisFiche;
+    dernierEleveDeLaGrille = studentId;
+    derniereAnneeDeLaGrille = data.annee;
 
-    $('#grille-eleve-title').textContent =
-      `${data.etudiant.prenom} ${data.etudiant.nom} (${data.etudiant.matricule})`;
+    const bilan = data.bilans.find((b) => b.annee === data.annee) || data.bilans[0];
+
+    $('#grille-eleve-title').textContent = `${data.etudiant.prenom} ${data.etudiant.nom}`;
 
     $('#grille-eleve-body').innerHTML = `
-      <div class="detail-grid">
-        <div class="detail-item"><span>Cours</span><b>${escapeHtml(data.cours.matiere_nom)}</b></div>
-        <div class="detail-item"><span>Enseignant</span><b>${escapeHtml(data.cours.teacher_full_name)}</b></div>
-        <div class="detail-item"><span>Classe</span><b>${escapeHtml(data.etudiant.classe || '—')}</b></div>
-        <div class="detail-item"><span>Tarif mensuel</span><b>${data.prix ? formatAmount(data.prix) + ' DA' : '—'}</b></div>
-        <div class="detail-item"><span>Année</span><b>${data.annee}</b></div>
-        <div class="detail-item"><span>Total réglé</span><b>${formatAmount(total)} DA</b></div>
+      <div class="grille-head">
+        <button class="btn btn-light btn-sm" id="btn-retour-cours">← Retour aux cours</button>
+        <div class="grille-cours">
+          <span class="grille-matiere">${escapeHtml(data.cours.matiere_nom)}</span>
+          <span class="grille-prof">${escapeHtml(data.cours.teacher_full_name)} · ${data.prix ? formatAmount(data.prix) + ' DA/mois' : 'prix non défini'}</span>
+        </div>
+        <span class="grille-totaux">
+          ${bilan.mois_payes}/${bilan.mois_du || 0} mois réglés ·
+          <b>${formatAmount(bilan.montant_paye)} DA</b>
+          ${bilan.montant_du > 0 ? `<span class="is-warn"> · reste ${formatAmount(bilan.montant_du)} DA</span>` : ''}
+        </span>
       </div>
-      <p class="hint-inline">Cliquez un mois pour le marquer payé ou le décocher.</p>
-      <div class="mois-grille">
-        ${data.mois
-          .map((m) => {
-            const futur = moisCourant && m.mois > moisCourant;
-            return `<button class="mois-cell ${m.paye ? 'is-paye' : 'is-impaye'} ${m.mois === moisCourant ? 'is-current' : ''} ${futur ? 'is-future' : ''}"
-              data-mois="${m.mois}" ${futur ? 'disabled' : ''}
-              title="${m.paye ? 'Payé le ' + escapeHtml(m.date_paiement || '') : 'Non payé'}">
-              <span class="mois-nom">${MOIS_COURTS[m.mois - 1]}</span>
-              <span class="mois-mark">${m.paye ? '✓' : ''}</span>
-              <span class="mois-amount">${formatAmount(m.montant)}</span>
+
+      <div class="annee-tabs">
+        ${data.bilans
+          .map((b) => {
+            const cls = b.annee === data.annee ? 'is-active' : b.montant_du > 0 ? 'is-impaye' : 'is-ok';
+            let label;
+            if (b.a_venir) label = 'à venir';
+            else if (b.echu && b.complet) label = 'soldée';
+            else if (b.echu) label = `${b.mois_du - b.mois_payes} impayé(s)`;
+            else if (b.annee === data.annee_courante) label = 'en cours';
+            else label = `${b.mois_payes}/${b.mois_du}`;
+            return `<button class="annee-tab ${cls}" data-annee="${b.annee}" title="${escapeHtml(label)}">
+              <span class="annee-tab-y">${b.annee}</span>
+              <span class="annee-tab-l">${escapeHtml(label)}</span>
             </button>`;
           })
           .join('')}
       </div>
-      <p class="hint-inline">${payes} mois réglé(s) sur 12 — ${12 - payes} restant(s).</p>`;
 
+      <div class="mois-grille">
+        ${data.mois
+          .map((m) => {
+            const bloque = m.statut === 'avenir' || m.statut === 'hors-periode';
+            return `<button class="mois-cell is-${m.statut} ${m.mois === data.mois_courant && data.annee === data.annee_courante ? 'is-current' : ''}"
+              data-mois="${m.mois}" ${bloque ? 'disabled' : ''}
+              title="${escapeHtml(
+                m.statut === 'paye'
+                  ? 'Payé le ' + (m.date_paiement || '')
+                  : m.statut === 'impaye'
+                    ? 'Impayé — cliquez pour marquer payé'
+                    : m.statut === 'avenir'
+                      ? 'Pas encore dû'
+                      : 'Avant l\'inscription à ce cours'
+              )}">
+              <span class="mois-nom">${MOIS_COURTS[m.mois - 1]}</span>
+              <span class="mois-mark">${m.statut === 'paye' ? '✓' : m.statut === 'impaye' ? '!' : m.statut === 'hors-periode' ? '–' : ''}</span>
+              <span class="mois-amount">${m.statut === 'hors-periode' ? '' : formatAmount(m.montant)}</span>
+            </button>`;
+          })
+          .join('')}
+      </div>
+
+      <div class="grille-legende">
+        <span><i class="lg lg-paye"></i> payé</span>
+        <span><i class="lg lg-impaye"></i> impayé</span>
+        <span><i class="lg lg-avenir"></i> pas encore dû</span>
+        <span><i class="lg lg-hors"></i> avant l'inscription (${String(data.mois_inscription).padStart(2, '0')}/${data.annee_inscription})</span>
+      </div>`;
+
+    // Navigation entre les années
+    $('#grille-eleve-body')
+      .querySelectorAll('[data-annee]')
+      .forEach((tab) => {
+        tab.addEventListener('click', () =>
+          openGrilleEleve(studentId, matiereId, teacherId, parseInt(tab.dataset.annee, 10), grilleOuverteDepuisFiche)
+        );
+      });
+
+    // Un mois cliquable bascule son état
     $('#grille-eleve-body')
       .querySelectorAll('.mois-cell:not([disabled])')
       .forEach((cell) => {
@@ -1435,19 +1563,31 @@
             montant: courant.montant
           });
           await refreshStudentList();
-          openGrilleEleve(data.etudiant.id, data.cours.matiere_id, data.cours.teacher_id, data.annee);
+          openGrilleEleve(data.etudiant.id, data.cours.matiere_id, data.cours.teacher_id, data.annee, grilleOuverteDepuisFiche);
         });
       });
+
+    // Retour à la liste des cours de l'élève
+    const back = $('#btn-retour-cours');
+    if (back) back.addEventListener('click', () => openFicheEleve(studentId, data.annee));
+    else if (grilleOuverteDepuisFiche) {
+      // Entrée depuis la fiche : sans bouton de retour, la fermeture fait le retour.
+      grilleOuverteDepuisFiche = true;
+    }
 
     $('#grille-eleve-overlay').classList.add('active');
   }
 
-  $('#btn-close-grille-eleve').addEventListener('click', () => {
+  function fermerGrilleEleve() {
+    const eleveId = grilleOuverteDepuisFiche ? dernierEleveDeLaGrille : null;
+    const annee = grilleOuverteDepuisFiche ? derniereAnneeDeLaGrille : null;
     $('#grille-eleve-overlay').classList.remove('active');
-  });
-  $('#btn-close-grille-eleve-2').addEventListener('click', () => {
-    $('#grille-eleve-overlay').classList.remove('active');
-  });
+    grilleOuverteDepuisFiche = false;
+    if (eleveId) openFicheEleve(eleveId, annee);
+  }
+
+  $('#btn-close-grille-eleve').addEventListener('click', fermerGrilleEleve);
+  $('#btn-close-grille-eleve-2').addEventListener('click', fermerGrilleEleve);
 
   // ============================================================
   //  SUPPRESSION D'UN ÉLÈVE
@@ -1568,7 +1708,7 @@
         const rowPayes = Object.values(s.payments).filter((p) => p.paye).length;
         return `<tr>
           <td><b>${escapeHtml(s.matricule)}</b></td>
-          <td>${escapeHtml(s.prenom)} ${escapeHtml(s.nom)}</td>
+          <td><span class="pay-name" data-fiche="${s.id}">${escapeHtml(s.prenom)} ${escapeHtml(s.nom)}</span></td>
           <td>${escapeHtml(s.classe || '')}</td>
           ${cells}
           <td class="is-num"><b>${rowPayes}/12</b></td>
@@ -1576,6 +1716,10 @@
         </tr>`;
       })
       .join('');
+
+    body.querySelectorAll('[data-fiche]').forEach((el) => {
+      el.addEventListener('click', () => openFicheEleve(parseInt(el.dataset.fiche, 10), payState.annee));
+    });
 
     body.querySelectorAll('.pay-cell').forEach((td) => {
       td.addEventListener('click', async () => {

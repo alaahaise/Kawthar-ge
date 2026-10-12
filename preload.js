@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('api', {
   paymentsReport: (params) => ipcRenderer.invoke('paiements:report', params),
   paiementsEtatEleves: (params) => ipcRenderer.invoke('paiements:etatEleves', params),
   paiementsGrilleEleve: (params) => ipcRenderer.invoke('paiements:grilleEleve', params),
+  paiementsCoursEleve: (studentId) => ipcRenderer.invoke('paiements:coursEleve', studentId),
 
   // ---------- Année de travail ----------
   anneeInitiale: () => ipcRenderer.invoke('annee:initiale'),

@@ -1918,47 +1918,180 @@ ipcMain.handle('paiements:etatEleves', (event, params) => {
 });
 
 /**
+ * Règles métier d'une année d'abonnement.
+ *
+ * Un mois est dans l'un de quatre états, et pas seulement « payé / impayé » :
+ *
+ *   - hors-periode : antérieur à l'inscription de l'élève à CE cours. On ne
+ *     facture jamais une période où l'élève n'était pas inscrit — sinon un
+ *     élève arrivé en mars se voit réclamer janvier et février.
+ *   - a-venir      : pas encore échu (mois en cours non terminé, ou année
+ *     future). Ce n'est pas un impayé : c'est une dette qui n'existe pas
+ *     encore, et la compter en ferait un faux débit.
+ *   - paye / impaye: dus, réglés ou non.
+ */
+function moisStatut(annee, mois, anneeInsc, moisInsc, anneeCourante, moisCourant, paye) {
+  if (annee < anneeInsc) return 'hors-periode';
+  if (annee > anneeCourante) return 'avenir';
+  if (annee === anneeInsc && mois < moisInsc) return 'hors-periode';
+  if (annee === anneeCourante && mois > moisCourant) return 'avenir';
+  return paye ? 'paye' : 'impaye';
+}
+
 /** Grille annuelle d'UN élève pour un cours (une matière + un professeur). */
 ipcMain.handle('paiements:grilleEleve', (event, params) => {
   const p = params || {};
   const studentId = parseInt(p.student_id, 10);
   const matiereId = parseInt(p.matiere_id, 10);
   const teacherId = parseInt(p.teacher_id, 10);
-  const annee = p.annee ? parseInt(p.annee, 10) : new Date().getFullYear();
+  const anneeDemandee = p.annee ? parseInt(p.annee, 10) : null;
   if (!studentId || !matiereId || !teacherId) return null;
 
-  const etudiant = query('SELECT matricule, nom, prenom, classe FROM students WHERE id = ?', [studentId])[0];
+  const etudiant = query(
+    'SELECT id, matricule, nom, prenom, classe, date_inscription FROM students WHERE id = ?',
+    [studentId]
+  )[0];
   if (!etudiant) return null;
-  const inscrit = query(
-    'SELECT 1 FROM student_matieres WHERE student_id = ? AND matiere_id = ? AND teacher_id = ?',
+
+  const inscription = query(
+    'SELECT date_inscription FROM student_matieres WHERE student_id = ? AND matiere_id = ? AND teacher_id = ?',
     [studentId, matiereId, teacherId]
   )[0];
-  if (!inscrit) return null;
+  if (!inscription) return null; // l'élève ne suit pas ce cours
 
   const cours = query(COURS_SELECT + ' WHERE mt.matiere_id = ? AND mt.teacher_id = ?', [matiereId, teacherId])[0];
-  const paiements = query(
-    'SELECT mois, montant, paye, date_paiement FROM paiements WHERE student_id = ? AND matiere_id = ? AND teacher_id = ? AND annee = ?',
-    [studentId, matiereId, teacherId, annee]
-  );
+  const prix = cours ? Number(cours.prix_mensuel) || 0 : 0;
 
-  const parMois = {};
-  paiements.forEach((r) => {
-    parMois[r.mois] = { montant: Number(r.montant) || 0, paye: !!r.paye, date_paiement: r.date_paiement || '' };
+  const maintenant = new Date();
+  const anneeCourante = maintenant.getFullYear();
+  const moisCourant = maintenant.getMonth() + 1;
+
+  const dateInsc = inscription.date_inscription || formatTodayDDMMYYYY();
+  const anneeInsc = parseInt(yearFromDisplayDate(dateInsc), 10) || anneeCourante;
+  const moisInsc = parseInt(String(dateInsc).split('/')[1], 10) || 1;
+
+  // Tous les paiements de ce cours pour cet élève, toutes années confondues :
+  // le bilan de chaque année en découle sans requête supplémentaire.
+  const lignes = query(
+    'SELECT annee, mois, montant, paye, date_paiement FROM paiements WHERE student_id = ? AND matiere_id = ? AND teacher_id = ?',
+    [studentId, matiereId, teacherId]
+  );
+  const parAnnee = {};
+  lignes.forEach((r) => {
+    if (!parAnnee[r.annee]) parAnnee[r.annee] = {};
+    parAnnee[r.annee][r.mois] = r;
   });
 
-  const prix = cours ? Number(cours.prix_mensuel) || 0 : 0;
+  /** Bilan d'une année : ce qui était dû, ce qui est réglé, ce qui reste. */
+  function bilan(annee) {
+    const cells = parAnnee[annee] || {};
+    let dus = 0;
+    let payes = 0;
+    let montantPaye = 0;
+    let montantDu = 0;
+    for (let m = 1; m <= 12; m += 1) {
+      const l = cells[m];
+      const statut = moisStatut(annee, m, anneeInsc, moisInsc, anneeCourante, moisCourant, l && l.paye);
+      if (statut === 'impaye' || statut === 'paye') dus += 1;
+      if (statut === 'paye') {
+        payes += 1;
+        montantPaye += Number(l.montant) || 0;
+      } else if (statut === 'impaye') {
+        montantDu += l ? Number(l.montant) || 0 : prix;
+      }
+    }
+    return {
+      annee,
+      mois_du: dus,
+      mois_payes: payes,
+      montant_paye: montantPaye,
+      montant_du: montantDu,
+      echu: annee < anneeCourante,
+      complet: dus > 0 && payes === dus,
+      a_venir: annee > anneeCourante
+    };
+  }
+
+  // Années proposées : depuis l'inscription jusqu'à l'année suivante, plus
+  // celles qui portent déjà des paiements.
+  const annees = new Set([anneeInsc, anneeCourante, anneeCourante + 1]);
+  Object.keys(parAnnee).forEach((a) => {
+    const n = parseInt(a, 10);
+    if (n >= anneeInsc) annees.add(n);
+  });
+  const anneesTriees = Array.from(annees).sort((a, b) => a - b);
+
+  // Une année antérieure à l'inscription n'existe pas : on retombe sur la
+  // première année réellement ouverte plutôt que sur l'année courante, sinon
+  // demander 2025 pour un élève inscrit en 2026 afficherait 2026 en silence.
+  let annee = anneeCourante;
+  if (anneeDemandee) {
+    if (anneesTriees.includes(anneeDemandee)) annee = anneeDemandee;
+    else if (anneeDemandee < anneesTriees[0]) annee = anneesTriees[0];
+  }
+  const cells = parAnnee[annee] || {};
+
   return {
     etudiant,
     cours: cours ? normalizeCours(cours) : null,
     annee,
+    annee_courante: anneeCourante,
+    mois_courant: moisCourant,
+    annee_inscription: anneeInsc,
+    mois_inscription: moisInsc,
+    date_inscription_cours: dateInsc,
     prix,
-    mois: Array.from({ length: 12 }, (_, i) => ({
-      mois: i + 1,
-      paye: !!parMois[i + 1],
-      montant: parMois[i + 1] ? parMois[i + 1].montant : prix,
-      date_paiement: parMois[i + 1] ? parMois[i + 1].date_paiement : ''
-    }))
+    // Bilan de chaque année, pour l'affichage « 2024 · soldée ».
+    bilans: anneesTriees.map(bilan),
+    mois: Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const l = cells[m];
+      const paye = !!(l && l.paye);
+      return {
+        mois: m,
+        paye,
+        montant: l ? Number(l.montant) || 0 : prix,
+        date_paiement: l ? l.date_paiement || '' : '',
+        statut: moisStatut(annee, m, anneeInsc, moisInsc, anneeCourante, moisCourant, paye)
+      };
+    })
   };
+});
+
+/** Cours suivis par un élève — première étape de la fiche élève. */
+ipcMain.handle('paiements:coursEleve', (event, studentId) => {
+  const rows = query(
+    `SELECT sm.matiere_id, sm.teacher_id, sm.date_inscription,
+            m.nom AS matiere_nom, t.nom AS teacher_nom, t.prenom AS teacher_prenom,
+            COALESCE(mt.prix_mensuel, m.prix_mensuel, 0) AS prix_mensuel
+     FROM student_matieres sm
+     JOIN matieres m ON m.id = sm.matiere_id
+     LEFT JOIN teachers t ON t.id = sm.teacher_id
+     LEFT JOIN matiere_teachers mt ON mt.matiere_id = sm.matiere_id AND mt.teacher_id = sm.teacher_id
+     WHERE sm.student_id = ?
+     ORDER BY m.nom COLLATE NOCASE ASC, t.nom COLLATE NOCASE ASC`,
+    [studentId]
+  );
+
+  // Pour chaque cours, le nombre de mois impayés de l'année courante : sert à
+  // repérer d'un coup d'œil les cours en retard.
+  const anneeCourante = new Date().getFullYear();
+  const moisCourant = new Date().getMonth() + 1;
+
+  return rows.map((r) => {
+    const impayes = query(
+      `SELECT COUNT(*) c FROM paiements
+       WHERE student_id = ? AND matiere_id = ? AND teacher_id IS ? AND annee = ? AND mois <= ? AND paye = 0`,
+      [studentId, r.matiere_id, r.teacher_id, anneeCourante, moisCourant]
+    )[0].c;
+    return {
+      ...r,
+      matiere_nom: cleanMatiereName(r.matiere_nom),
+      teacher_full_name: teacherFullName({ nom: r.teacher_nom, prenom: r.teacher_prenom }) || 'Sans professeur',
+      prix_mensuel: Number(r.prix_mensuel) || 0,
+      annee_impayes: Number(impayes) || 0
+    };
+  });
 });
 ipcMain.handle('excel:template', async () => {
   try {
