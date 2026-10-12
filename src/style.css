@@ -1999,21 +1999,9 @@ th.col-avatar { width: 46px; }
 }
 
 /* ---------- BAR CHART (accueil, inscriptions par matière) ---------- */
-.matieres-stats-card .panel-header {
-  justify-content: space-between;
-  padding: 20px 24px;
-  margin-bottom: 0;
-  border-bottom: 1px solid var(--border);
-}
-.matieres-stats-card .panel-header h2 {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
-.matieres-stats-card .panel-header-icon {
-  display: none;
-}
+
+
+
 
 .bar-chart-total {
   font-size: 12px;
@@ -2024,20 +2012,9 @@ th.col-avatar { width: 46px; }
   border-radius: 999px;
 }
 
-.bar-chart-wrap {
-  padding: 22px 26px 22px;
-  overflow-x: auto;
-}
 
-.bar-chart {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 36px;
-  height: 250px;
-  border-bottom: 1px solid var(--border);
-  min-width: min-content;
-}
+
+
 
 .bar-col {
   display: flex;
@@ -2049,20 +2026,9 @@ th.col-avatar { width: 46px; }
   justify-content: flex-end;
 }
 
-.bar-value {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--blue-2);
-  text-align: center;
-  width: 100%;
-}
 
-.bar-track {
-  width: 26px;
-  height: 100%;
-  display: flex;
-  align-items: flex-end;
-}
+
+
 
 .bar {
   width: 100%;

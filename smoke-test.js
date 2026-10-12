@@ -55,7 +55,7 @@ function rendererCheck() {
     '#btn-reset-students-filters',
     // Tableau de bord
     '#chart-revenue',
-    '#chart-revenue-matiere',
+    // '#chart-revenue-matiere' retiré du tableau de bord (panneau sans usage)
     '#chart-repartition',
     '#dash-repartition',
     '#dash-annee',

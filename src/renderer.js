@@ -169,7 +169,7 @@
   let dashTeacher = '';
   let dashRepartition = 'matiere';
 
-  const chartRefs = { revenue: null, repartition: null, matiere: null };
+  const chartRefs = { revenue: null, repartition: null };
 
   // ============================================================
   //  NAVIGATION
@@ -216,37 +216,6 @@
     set('#stat-matieres', formatAmount(g.matieres));
     set('#stat-teachers', formatAmount(g.enseignants));
     set('#stat-impayes', formatAmount(g.impayes));
-  }
-
-  /** Barres horizontales (pas Chart.js) — « inscriptions par matière ». */
-  function renderMatieresStats(matieres) {
-    const wrap = $('#matieres-bar-chart');
-    if (!wrap) return;
-    const rows = (matieres || [])
-      .filter((m) => Number(m.student_count) > 0)
-      .sort((a, b) => Number(b.student_count) - Number(a.student_count));
-    const total = $('#matieres-bar-total');
-    if (total) total.textContent = rows.length ? `${formatAmount(rows.reduce((s, m) => s + Number(m.student_count), 0))} inscription(s)` : '';
-    if (!rows.length) {
-      wrap.innerHTML = '<p class="hint-inline">Aucune inscription pour le moment.</p>';
-      return;
-    }
-    const max = Math.max(...rows.map((r) => Number(r.student_count)), 1);
-    wrap.innerHTML = rows
-      .map(
-        (m) => `
-      <div class="bar-row">
-        <span class="bar-label" title="${escapeHtml(m.nom)}">${escapeHtml(m.nom)}</span>
-        <span class="bar-track"><span class="bar-fill" style="width:${(Number(m.student_count) / max) * 100}%"></span></span>
-        <span class="bar-value">${formatAmount(m.student_count)}</span>
-      </div>`
-      )
-      .join('');
-  }
-
-  async function refreshMatieresStats() {
-    const matieres = await window.api.matieresStats();
-    renderMatieresStats(matieres);
   }
 
   const PALETTE = ['#2f6bd8', '#1f9d55', '#e08a1e', '#8b5cf6', '#e0524a', '#0d9aa8', '#c2418f', '#6b7280', '#7a9c2f', '#b45309'];
@@ -302,40 +271,7 @@
       totalAnnee.textContent = `${formatAmount(rev.total)} DA encaissés · ${formatAmount(rev.attendu_annuel)} DA attendus`;
     }
 
-    // --- Encaissements par matière ---
-    const parMatiere = await window.api.statsRevenueParMatiere({ annee: dashAnnee, teacher_id: teacherId });
-    const ctxM = $('#chart-revenue-matiere');
-    const videM = $('#chart-matiere-empty');
-    if (ctxM) {
-      if (videM) videM.style.display = parMatiere.some((r) => r.montant > 0) ? 'none' : 'block';
-      if (chartRefs.matiere) chartRefs.matiere.destroy();
-      chartRefs.matiere = parMatiere.length
-        ? new Chart(ctxM, {
-            type: 'bar',
-            data: {
-              labels: parMatiere.map((r) => r.matiere_nom),
-              datasets: [
-                {
-                  label: 'Encaissé (DA)',
-                  data: parMatiere.map((r) => r.montant),
-                  backgroundColor: PALETTE[1] + 'cc',
-                  borderRadius: 5
-                }
-              ]
-            },
-            options: {
-              indexAxis: 'y',
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { beginAtZero: true, ticks: { callback: (v) => formatAmount(v), font: { size: 10 } } },
-                y: { ticks: { font: { size: 10 } } }
-              }
-            }
-          })
-        : null;
-    }
+    // --- Encaissements par matière : panneau retiré (sans usage) ---
 
     await renderRepartitionChart();
   }
@@ -425,7 +361,6 @@
     populateMatiereSelects();
     populateTeacherSelects();
     renderCoursTable();
-    refreshMatieresStats();
   }
 
   function populateMatiereSelects() {
@@ -2133,7 +2068,6 @@
     renderTeachersView();
     renderMatiereChecklist();
     renderCoursTable();
-    await refreshMatieresStats();
     await refreshDashboardCharts();
     await refreshStats();
     const f = $('#filter-classe-etudiants');
@@ -2421,7 +2355,6 @@
     setupCoursSorting();
     showYearBanner(anneeInfo);
     refreshStats();
-    refreshMatieresStats();
     await refreshDashboardCharts();
     await refreshStudentList();
     updateStudentsFilterHint();
