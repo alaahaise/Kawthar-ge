@@ -31,20 +31,34 @@ function ensureDirs() {
 let batchMode = false;
 let batchDirty = false;
 
+/**
+ * Écrit la base de façon atomique : on écrit d'abord dans un fichier
+ * temporaire, puis on le renomme sur la base réelle.
+ *
+ * Un writeFileSync direct laisse, si le processus est interrompu en pleine
+ * écriture (coupure de courant, plantage, arrêt forcé), une base tronquée et
+ * donc corrompue — toutes les données perdues. Le renommage est atomique au
+ * niveau du système de fichiers : on a toujours soit l'ancienne base complète,
+ * soit la nouvelle, jamais un mélange des deux.
+ */
+function writeDbAtomic(data) {
+  const tmp = `${dbPath}.tmp`;
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, dbPath);
+}
+
 function saveDbToDisk() {
   if (batchMode) {
     batchDirty = true;
     return;
   }
-  const data = db.export();
-  fs.writeFileSync(dbPath, Buffer.from(data));
+  writeDbAtomic(Buffer.from(db.export()));
 }
 
 /** Force l'écriture immédiate (fin de lot, ou demande explicite). */
 function flushDbToDisk() {
   batchDirty = false;
-  const data = db.export();
-  fs.writeFileSync(dbPath, Buffer.from(data));
+  writeDbAtomic(Buffer.from(db.export()));
 }
 
 ipcMain.handle('db:beginBatch', () => {
@@ -466,7 +480,7 @@ function showSplash() {
     skipTaskbar: true,
     show: true,
     backgroundColor: '#f2f5fb',
-    webPreferences: { contextIsolation: true, nodeIntegration: false }
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   splashWindow.loadFile(path.join(__dirname, 'src', 'splash.html'));
   // Une fenêtre de chargement qui reste ouverte casserait l'application.
@@ -537,7 +551,11 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Explicite plutôt qu'implicite : aligné sur la valeur par défaut
+      // d'Electron quand nodeIntegration est désactivé, mais écrit noir sur
+      // blanc pour qu'un futur changement de défaut ne l'entraîne pas.
+      sandbox: true
     }
   });
 
