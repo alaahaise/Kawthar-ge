@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline';" />
+<title>Gestion des Étudiants</title>
+<style>
+  :root {
+    --maroon-1: #8a1518;
+    --maroon-2: #4a0c10;
+    --navy: #26313f;
+    --ink: #1e2733;
+    --muted: #6b7688;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #f2f5fb;
+    font-family: "Segoe UI", -apple-system, Arial, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .splash {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+  }
+
+  /* ---- Bannière identique à celle de la carte d'élève ---- */
+  .banner {
+    position: relative;
+    width: 520px;
+    height: 104px;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 0 30px;
+    background: linear-gradient(120deg, var(--maroon-1), var(--maroon-2));
+    box-shadow: 0 14px 34px rgba(74, 12, 16, 0.32);
+  }
+  /* Bandes décoratives (celles de la carte) */
+  .banner::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    right: 90px;
+    width: 26px;
+    height: 190px;
+    background: var(--navy);
+    transform: rotate(20deg);
+    opacity: 0.85;
+  }
+  .banner::after {
+    content: "";
+    position: absolute;
+    top: -40px;
+    right: 155px;
+    width: 7px;
+    height: 190px;
+    background: rgba(255, 255, 255, 0.55);
+    transform: rotate(20deg);
+  }
+
+  .logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .logo svg { width: 34px; height: 34px; fill: #fff; }
+
+  .titles { display: flex; flex-direction: column; z-index: 1; line-height: 1.25; }
+  .titles .l1, .titles .l2 {
+    font-weight: 800;
+    font-size: 19px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .titles .l3 {
+    margin-top: 3px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+  }
+
+  .subtitle {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ---- Barre de progression ---- */
+  .bar {
+    width: 320px;
+    height: 6px;
+    border-radius: 999px;
+    background: #e3e8f0;
+    overflow: hidden;
+  }
+  .bar > span {
+    display: block;
+    height: 100%;
+    width: 38%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--maroon-1), var(--maroon-2));
+    animation: slide 1.25s ease-in-out infinite;
+  }
+  @keyframes slide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(340%); }
+  }
+
+  .status { font-size: 12.5px; color: var(--muted); font-weight: 600; min-height: 18px; }
+
+  .footer {
+    position: absolute;
+    bottom: 22px;
+    display: flex;
+    gap: 18px;
+    font-size: 11.5px;
+    color: #9aa5b4;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <div class="splash">
+    <div class="banner">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 3 1 8l11 5 9-4.1V17h2V8L12 3zm-7 8.2V15c0 2 3.1 4 7 4s7-2 7-4v-3.8l-7 3.2-7-3.2z"/>
+        </svg>
+      </div>
+      <div class="titles">
+        <span class="l1">Établissement</span>
+        <span class="l2">El Kawther</span>
+        <span class="l3">Éducation et Formation</span>
+      </div>
+    </div>
+
+    <div class="subtitle">Gestion des Étudiants</div>
+    <div class="bar"><span></span></div>
+    <div class="status" id="splash-status">Ouverture de la base de données…</div>
+
+    <div class="footer">
+      <span>Sid Cheikh, Saida</span>
+      <span>+213 771 411 418</span>
+      <span>etablissement.elkawther@gmail.com</span>
+    </div>
+  </div>
+
+  <script>
+    // Le processus principal met à jour le texte via cette fonction exposée
+    // par le preload dédié au splash.
+    window.setSplashStatus = (txt) => {
+      const el = document.getElementById('splash-status');
+      if (el) el.textContent = txt;
+    };
+    // Réserve : si le message n'arrive pas, l'utilisateur voit autre chose.
+    setTimeout(() => window.setSplashStatus('Préparation de l\'interface…'), 1200);
+  </script>
+</body>
+</html>

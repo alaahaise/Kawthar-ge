@@ -167,7 +167,7 @@ body {
 /* ---------- STATS (accueil) ---------- */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
@@ -764,7 +764,790 @@ tbody tr:hover { background: #fafcff; }
     margin: 0;
     box-shadow: none;
   }
+
+  #report-print-area.will-print {
+    display: block !important;
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+  }
 }
+
+/* ---------- RAPPORTS IMPRIMABLES (relevés de paiement, listes) ---------- */
+.report-print {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 100%;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #1e2733;
+}
+.report-print h1 { font-size: 17px; margin: 0 0 4px; }
+.report-print p { font-size: 11.5px; margin: 0 0 3px; color: #4a5568; }
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 10px;
+}
+.report-table th,
+.report-table td {
+  border: 1px solid #c9d2e0;
+  padding: 4px 5px;
+  text-align: left;
+}
+.report-table thead th {
+  background: #eef2f9;
+  font-size: 9px;
+  text-transform: uppercase;
+  text-align: center;
+}
+.report-table td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) { text-align: center; }
+.report-table td.rp-paid { background: #e3f6e9; font-weight: 700; }
+
+/* ---------- FILTRES (page Étudiants) ---------- */
+.filters-card { padding: 16px 18px; margin-bottom: 16px; }
+
+.filters-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.filters-head strong { font-size: 13.5px; }
+.filters-head-icon { width: 17px; height: 17px; color: var(--blue-2); }
+.filters-head .btn { margin-left: 0; }
+.filters-head .results-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue-2);
+  background: var(--blue-light);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.filters-head #btn-toggle-students-filters { margin-left: auto; }
+
+.filters-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.filters-body.collapsed { display: none; }
+
+.filters-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 170px;
+  min-width: 150px;
+}
+.filter-field-wide { flex: 2 1 340px; }
+.filter-field-actions {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 2 1 320px;
+}
+.filter-field-actions .btn { white-space: nowrap; }
+
+.filter-field label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.filter-field input,
+.filter-field select {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  background: white;
+  color: var(--ink);
+  width: 100%;
+}
+.filter-field input:focus,
+.filter-field select:focus { border-color: var(--blue-1); }
+
+.inline-filters { display: flex; gap: 8px; }
+.inline-filters select { flex: 1; }
+
+.filters-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--blue-2);
+  font-weight: 600;
+}
+
+/* ---------- PETITS BOUTONS & PUCES ---------- */
+.btn-sm { padding: 6px 12px; font-size: 12.5px; }
+.btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.btn-link-danger {
+  background: none;
+  color: var(--danger);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.btn-link-danger:hover { text-decoration: underline; }
+
+.chip {
+  display: inline-block;
+  background: var(--blue-light);
+  color: var(--blue-2);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  margin: 1px 3px 1px 0;
+}
+.chip-row { display: flex; flex-wrap: wrap; max-width: 220px; }
+
+/* ---------- DÉFILEMENT HORIZONTAL DES TABLEAUX ---------- */
+.table-scroll { overflow-x: auto; }
+
+/* ---------- GRILLE DES PAIEMENTS ---------- */
+.pay-summary {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.summary-item { display: flex; flex-direction: column; gap: 2px; }
+.summary-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.summary-val { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+.pay-grid { font-size: 12.5px; }
+.pay-grid th, .pay-grid td { padding: 6px 5px; white-space: nowrap; }
+
+.pay-month-head {
+  text-align: center !important;
+  vertical-align: bottom;
+  background: #f7f9fd;
+}
+.pay-month-head.is-current { background: var(--blue-light); }
+.pay-month-head > span { display: block; font-weight: 800; color: var(--ink); margin-bottom: 3px; }
+
+.month-all {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  width: 20px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.month-all svg { width: 13px; height: 13px; }
+.month-all:hover { color: #1f9d55; }
+
+.pay-sticky {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 2;
+  min-width: 165px;
+  border-right: 1px solid var(--border);
+}
+.pay-grid tbody tr:hover .pay-sticky { background: #fafcff; }
+.pay-sticky b { display: block; color: var(--blue-2); font-size: 11.5px; }
+.pay-name { font-weight: 600; }
+
+.pay-cell {
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  min-width: 58px;
+}
+.pay-cell.is-current { background: #f6f9ff; }
+.pay-cell.is-paye { background: #e6f7ec; }
+.pay-cell.is-paye.is-current { background: #d5f0e0; }
+.pay-cell:hover { outline: 2px solid var(--blue-1); outline-offset: -2px; }
+
+.pay-mark { display: block; color: #1f9d55; }
+.pay-mark svg { width: 14px; height: 14px; display: inline-block; }
+.pay-amount { display: block; font-size: 10.5px; color: #1f7a45; font-weight: 700; }
+.pay-amount-muted { color: #b9c2d0; font-weight: 500; }
+
+.pay-total { text-align: center; font-weight: 700; background: #fafcff; }
+.pay-total .pay-amount { color: var(--blue-2); }
+
+/* ---------- MODALE LARGE & TABLEAUX COMPACTS ---------- */
+.modal-wide { width: 820px; }
+.modal-body-col { flex-direction: column; align-items: stretch; gap: 10px; max-height: 62vh; overflow-y: auto; }
+
+.mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-table th, .mini-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.mini-table thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: #f7f9fd;
+}
+
+/* ---------- FORMULAIRES "SOIGNÉS" ---------- */
+.pretty-form { display: flex; flex-direction: column; gap: 14px; }
+.pf-row { display: flex; gap: 12px; }
+.pf-row > * { flex: 1; min-width: 0; }
+
+.pf-field { display: flex; flex-direction: column; gap: 6px; }
+
+.pf-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pf-required::after {
+  content: '*';
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.pf-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 0 12px;
+  background: white;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pf-input:focus-within {
+  border-color: var(--blue-1);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.13);
+}
+.pf-input.is-readonly { background: #f4f6fa; }
+
+.pf-icon { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+.pf-input:focus-within .pf-icon { color: var(--blue-1); }
+
+.pf-input input,
+.pf-input select,
+.pf-input textarea {
+  border: none;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  font-size: 14px;
+  font-family: inherit;
+  background: transparent;
+  color: var(--ink);
+}
+.pf-input.is-readonly input { font-weight: 700; color: var(--blue-2); }
+.pf-input.is-area { align-items: stretch; padding: 0; }
+.pf-input textarea { padding: 11px 12px; resize: vertical; line-height: 1.45; }
+
+.pf-input select {
+  appearance: none;
+  cursor: pointer;
+  /* Flèche dessinée en CSS : le <select> natif de Chromium paraît brut. */
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) calc(50% + 1px), calc(100% - 10px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 26px;
+}
+.pf-input.is-select { padding-right: 10px; }
+
+.pf-suffix {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  padding-left: 2px;
+  flex-shrink: 0;
+}
+
+.pf-note {
+  margin: -4px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.pf-actions { display: flex; gap: 10px; margin-top: 2px; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: #f4f6fa; color: var(--ink); }
+
+/* ---------- TABLE DES COURS ---------- */
+.cours-table { font-size: 13px; }
+.cours-table th, .cours-table td { padding: 9px 12px; text-align: left; white-space: nowrap; }
+.cours-table tbody tr:hover { background: #fafcff; }
+.cours-matiere { font-weight: 700; color: var(--ink); }
+.cours-teacher { display: flex; align-items: center; gap: 8px; }
+.cours-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--blue-1), var(--blue-2));
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cours-price { font-weight: 700; color: var(--blue-2); }
+
+/* ---------- PAIEMENTS : sélecteur enseignant ---------- */
+.payments-teacher-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pay-course-name { font-weight: 700; }
+.pay-course-prof { font-size: 12px; color: var(--muted); }
+
+/* ---------- COLONNE STATUT (payé / impayé) ---------- */
+.statut-cell { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+
+.statut-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.statut-pill.is-paye { background: #e3f6e9; color: #1f7a45; }
+.statut-pill.is-paye:hover { background: #cdeed7; }
+.statut-pill.is-impaye { background: #fbe4e0; color: var(--danger); }
+.statut-pill.is-impaye:hover { background: #f7d0c9; }
+
+/* ---------- GRILLE DES MOIS D'UN ÉLÈVE ---------- */
+.mois-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.mois-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 6px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #fbfcff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.1s ease, box-shadow 0.12s ease;
+}
+.mois-cell:hover:not([disabled]) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(20, 40, 90, 0.12); }
+.mois-nom { font-size: 12px; font-weight: 700; color: var(--ink); }
+.mois-mark { font-size: 15px; font-weight: 800; line-height: 1.1; height: 18px; }
+.mois-amount { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+.mois-cell.is-paye { background: #e3f6e9; border-color: #b6e4c8; }
+.mois-cell.is-paye .mois-mark { color: #1f9d55; }
+.mois-cell.is-paye .mois-amount { color: #1f7a45; }
+.mois-cell.is-impaye .mois-mark { color: transparent; }
+.mois-cell.is-current { outline: 2px solid var(--blue-1); outline-offset: -2px; }
+.mois-cell.is-future { opacity: 0.45; cursor: not-allowed; background: #f4f6fa; }
+
+/* ---------- BANNIÈRE DE NOUVELLE ANNÉE ---------- */
+.year-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(120deg, #eefaf1, #e6f4ff);
+  border: 1px solid #bfe3cc;
+  border-radius: 12px;
+  padding: 13px 16px;
+  margin-bottom: 16px;
+}
+.year-banner-icon { width: 26px; height: 26px; color: #1f9d55; flex-shrink: 0; }
+.year-banner-text { font-size: 13px; color: var(--ink); line-height: 1.5; flex: 1; }
+.year-banner .btn { flex-shrink: 0; }
+
+/* ---------- APERÇU D'IMPORT EXCEL ---------- */
+.import-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.import-chip {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.import-ok { background: #e3f6e9; color: #1f7a45; }
+.import-ko { background: #fbe4e0; color: var(--danger); }
+
+.import-table { font-size: 12.5px; }
+.import-table th, .import-table td { padding: 6px 9px; vertical-align: top; }
+.import-table tr.row-error { background: #fdf3f1; }
+.chip-error { background: #fbe4e0; color: var(--danger); font-weight: 700; }
+
+/* ---------- LISTE DE CHOIX (modales) ---------- */
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.choice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f9fd;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.choice-btn:hover { background: var(--blue-light); border-color: var(--blue-1); }
+.choice-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+.choice-sub { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+
+/* ---------- FORMULAIRES EMPILÉS (matières / enseignants) ---------- */
+.stack-form { display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px; }
+.stack-form-row { display: flex; gap: 9px; }
+.stack-form-row > * { flex: 1; min-width: 0; }
+.stack-form-actions { display: flex; gap: 9px; }
+
+.stack-form input,
+.inline-form input,
+.inline-form select {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  background: white;
+  color: var(--ink);
+  width: 100%;
+}
+.stack-form input:focus,
+.inline-form input:focus,
+.inline-form select:focus { border-color: var(--blue-1); }
+.stack-form input[readonly] { background: #f4f6fa; color: var(--muted); font-weight: 700; }
+.inline-form input,
+.inline-form select { flex: 1; min-width: 140px; width: auto; }
+
+/* ---------- MATRICE "QUI ENSEIGNE QUOI" ---------- */
+.matrix-table { font-size: 12.5px; border-collapse: collapse; }
+.matrix-table th, .matrix-table td {
+  border: 1px solid var(--border);
+  padding: 7px 8px;
+  text-align: center;
+}
+.matrix-corner {
+  text-align: left !important;
+  background: #f7f9fd;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-width: 160px;
+}
+.matrix-col-head { background: #f7f9fd; min-width: 86px; vertical-align: bottom; }
+.matrix-avatar {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--blue-1), var(--blue-2));
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.matrix-col-name { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+.matrix-col-sub { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+.matrix-row-head { text-align: left !important; background: #fafcff; font-weight: 600; }
+.matrix-row-sub { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.matrix-cell { background: white; }
+.matrix-check { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.matrix-check input { width: 17px; height: 17px; accent-color: var(--blue-1); cursor: pointer; }
+.matrix-count { font-weight: 700; color: var(--blue-2); background: #fafcff; }
+
+#view-matieres .content-pad { padding-bottom: 40px; }
+/* ---------- EN-TÊTES TRIABLES ---------- */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 20px;
+}
+th.sortable:hover { color: var(--blue-2); }
+th.sortable::after {
+  content: '⇅';
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  opacity: 0.35;
+  color: var(--blue-2);
+}
+th.sortable.is-active { color: var(--blue-2); }
+th.sortable.is-active::after { content: '▲'; opacity: 1; }
+th.sortable.is-desc::after { content: '▼'; }
+th.col-avatar { width: 46px; }
+
+/* ---------- TABLEAU DE BORD ---------- */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.dash-chart-card { padding: 0 0 14px; overflow: hidden; }
+.dash-chart-card > .panel-header {
+  padding: 16px 20px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.dash-chart-card > .panel-header h2 { font-size: 13.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.dash-head-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mini-select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 12.5px;
+  font-family: inherit;
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+}
+.dash-chart-body { position: relative; height: 260px; padding: 18px 20px 4px; }
+.dash-hint { margin: 0; padding: 6px 20px 0; font-size: 11.5px; color: var(--muted); }
+
+.dash-kpi-card { padding: 0 0 10px; overflow: hidden; }
+.dash-kpi-card > .panel-header {
+  padding: 16px 20px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+  justify-content: flex-start;
+}
+.dash-kpi-card > .panel-header h2 { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+
+.dash-kpis { padding: 6px 20px 0; display: flex; flex-direction: column; }
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.kpi:last-child { border-bottom: none; }
+.kpi-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.kpi-val { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+.kpi-val small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.kpi-val-sm { font-size: 17px; }
+.kpi-val.is-warn { color: var(--danger); }
+.kpi-val.is-ok { color: #1f9d55; }
+.kpi-sub { font-size: 11.5px; color: var(--muted); }
+.kpi-delta { font-size: 11.5px; font-weight: 700; }
+.kpi-delta.up { color: #1f9d55; }
+.kpi-delta.down { color: var(--danger); }
+.kpi-bar {
+  height: 7px;
+  background: #eef1f7;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+.kpi-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(120deg, var(--blue-1), var(--blue-2));
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ---------- PAGES ENSEIGNANTS / MATIÈRES ---------- */
+.teacher-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.teacher-form-card { padding: 20px; position: sticky; top: 0; }
+.teacher-list-card { padding: 20px; }
+.teacher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.entity-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fbfcff;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.entity-card:hover { border-color: #bcd2f7; box-shadow: 0 4px 14px rgba(20, 40, 90, 0.07); }
+
+.entity-head { display: flex; align-items: center; gap: 11px; }
+.entity-icon,
+.entity-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--blue-light);
+  color: var(--blue-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px;
+  flex-shrink: 0;
+}
+.entity-avatar {
+  border-radius: 50%;
+  background: linear-gradient(120deg, var(--blue-1), var(--blue-2));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+}
+.entity-title { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.entity-name {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.entity-sub { font-size: 12px; color: var(--muted); }
+.entity-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.entity-actions .btn-icon { margin-right: 0; }
+.entity-desc { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.entity-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.entity-contact > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.entity-contact svg { width: 13px; height: 13px; color: var(--muted); flex-shrink: 0; }
+.entity-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.entity-stat {
+  font-size: 11.5px;
+  color: var(--muted);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.entity-stat b { color: var(--blue-2); font-size: 12.5px; }
+.entity-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip-teacher { background: #f0ecff; color: #6d28d9; }
+.matieres-panel-wide { padding: 20px; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.detail-item {
+  background: #f7f9fd;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.detail-item span {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.detail-item b { font-size: 13.5px; color: var(--ink); word-break: break-word; }
+.detail-h3 {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 1200px) {
+  .dash-grid, .teacher-layout { grid-template-columns: 1fr; }
+  .teacher-form-card { position: static; }
+}
+
 /* ---------- MATIERES / ENSEIGNANTS ---------- */
 .matieres-grid {
   display: grid;
@@ -930,6 +1713,55 @@ tbody tr:hover { background: #fafcff; }
 .empty-inline { color: var(--muted); font-size: 13px; padding: 6px 2px; }
 .hint-inline { color: var(--muted); font-weight: 400; font-size: 12px; }
 
+/* Checklist d'inscription : une matière -> un ou plusieurs enseignants */
+.cours-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: white;
+}
+.cours-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.cours-group-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.cours-options { display: flex; flex-direction: column; gap: 6px; }
+
+.cours-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 13px;
+  background: #fbfcff;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.cours-option:hover { background: var(--blue-light); }
+.cours-option.is-on { background: var(--blue-light); border-color: var(--blue-1); }
+.cours-option input { width: 15px; height: 15px; accent-color: var(--blue-1); cursor: pointer; flex-shrink: 0; }
+.cours-option-name { font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
+.cours-option-price { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+
+.entity-stat-money { background: #eefaf1; border-color: #cdeed7; }
+.entity-stat-money b { color: #1f7a45; }
+
+.matyere-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: #f9fbff;
+}
+
 /* Checklist matières (formulaire d'inscription) */
 .matieres-checklist {
   display: flex;
@@ -1060,10 +1892,8 @@ tbody tr:hover { background: #fafcff; }
 }
 
 /* ---------- BAR CHART (accueil, inscriptions par matière) ---------- */
-.panel-header {
-  justify-content: space-between;
-}
 .matieres-stats-card .panel-header {
+  justify-content: space-between;
   padding: 20px 24px;
   margin-bottom: 0;
   border-bottom: 1px solid var(--border);
@@ -1116,6 +1946,8 @@ tbody tr:hover { background: #fafcff; }
   font-size: 12.5px;
   font-weight: 600;
   color: var(--blue-2);
+  text-align: center;
+  width: 100%;
 }
 
 .bar-track {
