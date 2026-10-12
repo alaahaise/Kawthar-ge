@@ -684,13 +684,15 @@ ipcMain.handle('students:list', (event, params) => {
   // règlement ; un élève inscrit et jamais saisi doit donc apparaître comme
   // impayé, pas être considéré à jour.
   // ---------------------------------------------------------------------
-  if (statut && statutAnnee) {
+  if (statut) {
     const anneeRef = new Date().getFullYear();
     const moisRef = new Date().getMonth() + 1;
+    // Sans année choisie, on raisonne sur l'année en cours.
+    const anneeStatut = statutAnnee || anneeRef;
 
     // Toutes les valeurs ci-dessous sont des entiers issus de parseInt() ou de
     // Date : aucune n'est une chaîne fournie par l'utilisateur, l'inlining est
-    // donc sans risque et évite de mantener l'ordre des paramètres à jour.
+    // donc sans risque et évite de maintenir l'ordre des paramètres à jour.
     const MOIS = Array.from({ length: 12 }, (_, i) => `SELECT ${i + 1} AS m`).join(' UNION ALL ');
 
     const anneeInsc = `COALESCE(CAST(NULLIF(substr(TRIM(x.date_inscription), 7, 4), '') AS INTEGER), ${anneeRef})`;
@@ -701,16 +703,15 @@ ipcMain.handle('students:list', (event, params) => {
       (statutTeacher ? ` AND x.teacher_id = ${statutTeacher}` : '');
     const borneMois = statutMois ? ` AND mo.m = ${statutMois}` : '';
 
-    // Mois facturable : postérieur à l'inscription, et non échu.
+    // Mois facturable : postérieur à l'inscription du cours, et déjà échu.
     const facturable = `(
-      (${statutAnnee} > ${anneeInsc} OR (${statutAnnee} = ${anneeInsc} AND mo.m >= ${moisInsc}))
-      AND (${statutAnnee} < ${anneeRef} OR (${statutAnnee} = ${anneeRef} AND mo.m <= ${moisRef}))
+      (${anneeStatut} > ${anneeInsc} OR (${anneeStatut} = ${anneeInsc} AND mo.m >= ${moisInsc}))
+      AND (${anneeStatut} < ${anneeRef} OR (${anneeStatut} = ${anneeRef} AND mo.m <= ${moisRef}))
     )`;
 
-    const cible = statut === 'paye' ? 1 : 0;
-
-    conditions.push(
-      `EXISTS (
+    // Existe-t-il, dans le périmètre, un mois facturable dont l'état de
+    // règlement vaut `paye` (1) ou `impaye` (0) ?
+    const moisDeStatut = (paye) => `EXISTS (
          SELECT 1
          FROM student_matieres x
          CROSS JOIN (${MOIS}) mo
@@ -718,13 +719,23 @@ ipcMain.handle('students:list', (event, params) => {
            ON py.student_id = x.student_id
           AND py.matiere_id = x.matiere_id
           AND py.teacher_id IS x.teacher_id
-          AND py.annee = ${statutAnnee}
+          AND py.annee = ${anneeStatut}
           AND py.mois = mo.m
          WHERE x.student_id = s.id${perimetre}${borneMois}
            AND ${facturable}
-           AND COALESCE(py.paye, 0) = ${cible}
-       )`
-    );
+           AND COALESCE(py.paye, 0) = ${paye}
+       )`;
+
+    if (statut === 'paye') {
+      // « Payé » = à jour sur TOUT le périmètre : il existe au moins un mois dû
+      // et aucun de ces mois n'est resté impayé. Une seule ligne réglée ne
+      // suffit pas — sinon un élève en retard partout mais à jour un mois donné
+      // passerait pour soldé.
+      conditions.push(`(${moisDeStatut(1)} AND NOT ${moisDeStatut(0)})`);
+    } else {
+      // « Impayé » = au moins un mois dû non réglé, tous mois confondus.
+      conditions.push(moisDeStatut(0));
+    }
   }
 
   if (search !== '') {
@@ -2089,50 +2100,69 @@ ipcMain.handle('paiements:etatEleves', (event, params) => {
   const teacherId = p.teacher_id ? parseInt(p.teacher_id, 10) : null;
   const annee = p.annee ? parseInt(p.annee, 10) : new Date().getFullYear();
 
-  const valeurs = [annee];
-  let perimetre = '';
-  if (matiereId) {
-    perimetre += ' AND sm.matiere_id = ?';
-    valeurs.push(matiereId);
-  }
-  if (teacherId) {
-    perimetre += ' AND sm.teacher_id = ?';
-    valeurs.push(teacherId);
-  }
-
-  const rows = query(
-    `SELECT sm.student_id, sm.matiere_id, sm.teacher_id, m.nom AS matiere_nom,
-            t.nom AS teacher_nom, t.prenom AS teacher_prenom,
-            SUM(CASE WHEN py.paye = 0 THEN 1 ELSE 0 END) AS impayes,
-            SUM(CASE WHEN py.paye = 1 THEN 1 ELSE 0 END) AS payes,
-            COALESCE(SUM(CASE WHEN py.paye = 0 THEN COALESCE(py.montant, 0) ELSE 0 END), 0) AS montant_du
+  // Cours du périmètre : matière seule, matière + enseignant, ou tous les cours
+  // si aucun des deux n'est fourni.
+  const cours = query(
+    `SELECT sm.student_id, sm.matiere_id, sm.teacher_id, sm.date_inscription,
+            m.nom AS matiere_nom, t.nom AS teacher_nom, t.prenom AS teacher_prenom,
+            COALESCE(mt.prix_mensuel, m.prix_mensuel, 0) AS prix_mensuel
      FROM student_matieres sm
      JOIN students s ON s.id = sm.student_id
      JOIN matieres m ON m.id = sm.matiere_id
      LEFT JOIN teachers t ON t.id = sm.teacher_id
-     LEFT JOIN paiements py
-       ON py.student_id = sm.student_id AND py.matiere_id = sm.matiere_id
-      AND py.teacher_id IS sm.teacher_id AND py.annee = ?
-     WHERE COALESCE(s.actif, 1) = 1${perimetre}
-     GROUP BY sm.student_id, sm.matiere_id, sm.teacher_id
-     ORDER BY s.nom COLLATE NOCASE ASC, s.prenom COLLATE NOCASE ASC`,
-    valeurs
+     LEFT JOIN matiere_teachers mt
+       ON mt.matiere_id = sm.matiere_id AND mt.teacher_id = sm.teacher_id
+     WHERE COALESCE(s.actif, 1) = 1${matiereId ? ` AND sm.matiere_id = ${matiereId}` : ''}${
+       teacherId ? ` AND sm.teacher_id = ${teacherId}` : ''
+     }
+     ORDER BY s.nom COLLATE NOCASE ASC, s.prenom COLLATE NOCASE ASC,
+              m.nom COLLATE NOCASE ASC, t.nom COLLATE NOCASE ASC`
   );
 
+  // Tous les règlements de l'année, indexés par (élève, cours, mois). Un cours
+  // sans ligne de paiement n'est PAS « réglé » : l'absence de ligne vaut
+  // impayé, exactement comme dans la liste des élèves et dans la grille.
+  const cle = (sid, mid, tid, mois) => `${sid}|${mid}|${tid == null ? '~' : tid}|${mois}`;
+  const payePar = {};
+  query('SELECT student_id, matiere_id, teacher_id, mois, paye FROM paiements WHERE annee = ?', [
+    annee
+  ]).forEach((r) => {
+    const k = cle(r.student_id, r.matiere_id, r.teacher_id, r.mois);
+    payePar[k] = payePar[k] || (r.paye ? 1 : 0);
+  });
+
+  const maintenant = new Date();
+  const anneeCourante = maintenant.getFullYear();
+  const moisCourant = maintenant.getMonth() + 1;
+
   const map = {};
-  rows.forEach((r) => {
-    if (!map[r.student_id]) map[r.student_id] = [];
-    const prof = teacherFullName({ nom: r.teacher_nom, prenom: r.teacher_prenom }) || 'Sans professeur';
-    map[r.student_id].push({
-      teacher_id: r.teacher_id,
-      matiere_id: r.matiere_id,
-      matiere_nom: cleanMatiereName(r.matiere_nom),
+  cours.forEach((c) => {
+    const dateInsc = c.date_inscription || formatTodayDDMMYYYY();
+    const anneeInsc = parseInt(yearFromDisplayDate(dateInsc), 10) || anneeCourante;
+    const moisInsc = parseInt(String(dateInsc).split('/')[1], 10) || 1;
+    const prix = Number(c.prix_mensuel) || 0;
+
+    let impayes = 0;
+    let payes = 0;
+    for (let mois = 1; mois <= 12; mois += 1) {
+      const regle = payePar[cle(c.student_id, c.matiere_id, c.teacher_id, mois)] === 1;
+      const statut = moisStatut(annee, mois, anneeInsc, moisInsc, anneeCourante, moisCourant, regle);
+      if (statut === 'impaye') impayes += 1;
+      else if (statut === 'paye') payes += 1;
+    }
+
+    if (!map[c.student_id]) map[c.student_id] = [];
+    const prof = teacherFullName({ nom: c.teacher_nom, prenom: c.teacher_prenom }) || 'Sans professeur';
+    map[c.student_id].push({
+      teacher_id: c.teacher_id,
+      matiere_id: c.matiere_id,
+      matiere_nom: cleanMatiereName(c.matiere_nom),
       teacher_nom: prof,
-      libelle: prof ? `${cleanMatiereName(r.matiere_nom)} · ${prof}` : cleanMatiereName(r.matiere_nom),
-      paye: Number(r.impayes) === 0,
-      impayes: Number(r.impayes) || 0,
-      payes: Number(r.payes) || 0,
-      montant_du: Number(r.montant_du) || 0
+      libelle: `${cleanMatiereName(c.matiere_nom)} · ${prof}`,
+      paye: impayes === 0,
+      impayes,
+      payes,
+      montant_du: impayes * prix
     });
   });
   return map;
@@ -2295,22 +2325,40 @@ ipcMain.handle('paiements:coursEleve', (event, studentId) => {
   );
 
   // Pour chaque cours, le nombre de mois impayés de l'année courante : sert à
-  // repérer d'un coup d'œil les cours en retard.
+  // repérer d'un coup d'œil les cours en retard. On applique la règle commune —
+  // un mois n'est dû que s'il est postérieur à l'inscription au cours, déjà
+  // échu, et non réglé ; l'absence de ligne de paiement compte comme un impayé.
   const anneeCourante = new Date().getFullYear();
   const moisCourant = new Date().getMonth() + 1;
 
   return rows.map((r) => {
-    const impayes = query(
-      `SELECT COUNT(*) c FROM paiements
-       WHERE student_id = ? AND matiere_id = ? AND teacher_id IS ? AND annee = ? AND mois <= ? AND paye = 0`,
-      [studentId, r.matiere_id, r.teacher_id, anneeCourante, moisCourant]
-    )[0].c;
+    const dateInsc = r.date_inscription || formatTodayDDMMYYYY();
+    const anneeInsc = parseInt(yearFromDisplayDate(dateInsc), 10) || anneeCourante;
+    const moisInsc = parseInt(String(dateInsc).split('/')[1], 10) || 1;
+
+    const payeParMois = {};
+    query(
+      `SELECT mois, paye FROM paiements
+       WHERE student_id = ? AND matiere_id = ? AND teacher_id IS ? AND annee = ?`,
+      [studentId, r.matiere_id, r.teacher_id, anneeCourante]
+    ).forEach((x) => {
+      payeParMois[x.mois] = payeParMois[x.mois] || (x.paye ? 1 : 0);
+    });
+
+    let impayes = 0;
+    for (let mois = 1; mois <= 12; mois += 1) {
+      const statut = moisStatut(
+        anneeCourante, mois, anneeInsc, moisInsc, anneeCourante, moisCourant, payeParMois[mois] === 1
+      );
+      if (statut === 'impaye') impayes += 1;
+    }
+
     return {
       ...r,
       matiere_nom: cleanMatiereName(r.matiere_nom),
       teacher_full_name: teacherFullName({ nom: r.teacher_nom, prenom: r.teacher_prenom }) || 'Sans professeur',
       prix_mensuel: Number(r.prix_mensuel) || 0,
-      annee_impayes: Number(impayes) || 0
+      annee_impayes: impayes
     };
   });
 });

@@ -96,6 +96,10 @@ app.whenReady().then(async () => {
       s.payes = await api.listStudents({
         paiement_matiere: m.id, paiement_mois: 10, paiement_annee: 2026, statut: 'paye'
       });
+      // Même chose, mais restreint au professeur chez qui tout est réglé.
+      s.payesKarim = await api.listStudents({
+        paiement_matiere: m.id, paiement_mois: 10, paiement_teacher: t1.id, paiement_annee: 2026, statut: 'paye'
+      });
       s.impayes = await api.listStudents({
         paiement_matiere: m.id, paiement_mois: 10, paiement_annee: 2026, statut: 'impaye'
       });
@@ -103,6 +107,8 @@ app.whenReady().then(async () => {
       s.impayesTousMois = await api.listStudents({
         paiement_matiere: m.id, paiement_annee: 2026, statut: 'impaye'
       });
+      // « Payé » sans matière ni mois : seuls les élèves réellement à jour.
+      s.payesTous = await api.listStudents({ paiement_annee: 2026, statut: 'paye' });
       // Cible d'un seul professeur.
       s.impayesKarim = await api.listStudents({
         paiement_matiere: m.id, paiement_teacher: t1.id, paiement_annee: 2026, statut: 'impaye'
@@ -119,9 +125,14 @@ app.whenReady().then(async () => {
       s.t1 = t1.id;
       return s;
     });
-    // Amine est payé chez Karim et impayé chez Rachid => présent dans les deux listes.
+    // Amine est payé chez Karim mais impayé chez Rachid. Tant que le périmètre
+    // couvre les deux professeurs, il n'est donc PAS à jour : « payé » veut
+    // dire « ne doit rien », pas « a réglé au moins un mois ».
     ck('état : deux professeurs pour Amine', etat.map[Object.keys(etat.map)[0]].length === 2, etat.map);
-    ck('filtre "payés" : Amine présent (il a payé chez Karim en octobre)', etat.payes.some((x) => x.nom === 'Bouzid'), etat.payes.map((x) => x.nom));
+    ck('filtre "payés" (matière entière, octobre) : Amine absent (doit octobre chez Rachid)', !etat.payes.some((x) => x.nom === 'Bouzid'), etat.payes.map((x) => x.nom));
+    ck('filtre "payés" (prof Karim, octobre) : Amine présent (tout réglé chez lui)', etat.payesKarim.some((x) => x.nom === 'Bouzid'), etat.payesKarim.map((x) => x.nom));
+    ck('filtre "payés" (prof Karim, octobre) : Yanis absent', !etat.payesKarim.some((x) => x.nom === 'Cherif'), etat.payesKarim.map((x) => x.nom));
+    ck('filtre "payés" (tout, tous mois) : personne n\'est soldé', etat.payesTous.length === 0, etat.payesTous.map((x) => x.nom));
     ck('filtre "payés" : Yanis absent', !etat.payes.some((x) => x.nom === 'Cherif'), etat.payes.map((x) => x.nom));
     ck('filtre "impayés" : Yanis présent', etat.impayes.some((x) => x.nom === 'Cherif'), etat.impayes.map((x) => x.nom));
     ck('filtre "impayés" : Amine présent (impayé chez Rachid)', etat.impayes.some((x) => x.nom === 'Bouzid'), etat.impayes.map((x) => x.nom));

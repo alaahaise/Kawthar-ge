@@ -72,6 +72,7 @@ const r = (code, arg) => win.webContents.executeJavaScript(`(${code.toString()})
         karim: await l({ statut: 'impaye', paiement_teacher: 1 }),
         rachid: await l({ statut: 'impaye', paiement_teacher: 2 }),
         payes: await l({ statut: 'paye', paiement_teacher: 1 }),
+        payesTout: await l({ statut: 'paye' }),
         moisPrecis: await l({ statut: 'impaye', paiement_mois: MOIS_COURANT, paiement_teacher: 1 })
       };
     }, MOIS_COURANT);
@@ -83,6 +84,9 @@ const r = (code, arg) => win.webContents.executeJavaScript(`(${code.toString()})
     ck('impayés chez Rachid : Yanis absent (il ne suit pas ce cours)', !tousMois.rachid.includes('Cherif'), tousMois.rachid);
     ck('payés chez Karim : Amine présent', tousMois.payes.includes('Bouzid'), tousMois.payes);
     ck('payés chez Karim : Yanis absent', !tousMois.payes.includes('Cherif'), tousMois.payes);
+    // Sans restriction de professeur, Amine doit quelque chose chez Rachid :
+    // il n'est donc PAS « payé » — un mois réglé ne suffit pas à être soldé.
+    ck('payés sans périmètre : Amine exclu (impayé chez Rachid)', !tousMois.payesTout.includes('Bouzid'), tousMois.payesTout);
     // Sur le mois courant, Yanis n'a rien réglé chez Karim : il doit sortir.
     ck(
       'mois précis impayé chez Karim : seul Yanis',

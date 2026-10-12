@@ -1099,8 +1099,8 @@
     const filters = currentStudentFilters();
     filters.sort = stateStudentSort.champ;
     filters.dir = stateStudentSort.dir;
-    // Le filtre d'état n'a de sens qu'avec une matière, un mois et une année.
-    if (!filters.paiement_matiere || !filters.paiement_mois || !filters.paiement_annee) filters.statut = '';
+    // Le filtre d'état porte sur tout le périmètre : sans matière ni mois, il
+    // couvre tous les cours et tous les mois de l'année choisie.
 
     paintSortIndicators('#students-head', '[data-sort]', stateStudentSort);
     updateStudentsFilterHint();
@@ -1185,7 +1185,7 @@
       pill.addEventListener('click', () =>
         openGrilleEleve(
           parseInt(pill.dataset.statutStudent, 10),
-          parseInt($('#statut-matiere').value, 10),
+          parseInt(pill.dataset.statutMatiere, 10),
           parseInt(pill.dataset.statutTeacher, 10),
           parseInt($('#statut-annee').value, 10) || anneeTravail
         )
@@ -1212,7 +1212,13 @@
         (e) => `<button class="statut-pill ${e.paye ? 'is-paye' : 'is-impaye'}"
           data-statut-student="${studentId}" data-statut-teacher="${e.teacher_id}"
           data-statut-matiere="${e.matiere_id}"
-          title="${e.paye ? `${e.payes} mois réglés — voir le détail` : `${e.impayes} impayé(s) · ${formatAmount(e.montant_du)} DA — voir le détail`}">
+          title="${
+            e.paye
+              ? e.payes === 0
+                ? 'Aucun mois dû — voir le détail'
+                : `${e.payes} mois réglés — voir le détail`
+              : `${e.impayes} impayé(s) · ${formatAmount(e.montant_du)} DA — voir le détail`
+          }">
           ${e.paye ? '✓' : '✕'} ${escapeHtml(e.libelle || e.teacher_nom)}
           ${e.impayes > 0 ? `<span class="statut-count">${e.impayes}</span>` : ''}
         </button>`

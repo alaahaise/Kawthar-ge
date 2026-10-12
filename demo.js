@@ -256,13 +256,25 @@ async function seedInRenderer(d) {
   // On ne facture que les mois postérieurs à l'inscription, et jusqu'au mois
   // précédent le mois en cours (le mois courant est encore en recouvrement,
   // c'est justement ce que le tableau de bord doit montrer).
+  //
+  // Les élèves « soldés » font exception : ils règlent TOUS leurs mois dus,
+  // mois courant compris. Sans eux, le filtre « Payés seulement » — qui ne
+  // montre que les élèves ne devant rien — serait toujours vide.
+  const indexesSortie = [2, 7, 13, 21];
+  const soldes = new Set();
+  for (let i = 0; i < eleves.length && soldes.size < 8; i += 1) {
+    if (!indexesSortie.includes(i)) soldes.add(i);
+  }
+
   let nbPaiements = 0;
-  for (const eleve of eleves) {
+  for (let i = 0; i < eleves.length; i += 1) {
+    const eleve = eleves[i];
     const debut = eleve.annee === d.anneeCourante ? eleve.moisInscription : 1;
-    const dernierMois = d.moisCourant - 1;
+    const solde = soldes.has(i);
+    const dernierMois = solde ? d.moisCourant : d.moisCourant - 1;
     for (const c of eleve.cours) {
       for (let mois = debut; mois <= Math.max(debut - 1, dernierMois); mois += 1) {
-        if (rnd() > 0.75) continue;
+        if (!solde && rnd() > 0.75) continue;
         const montant = rnd() < 0.12 ? Math.round((c.prix * int(50, 100)) / 100 / 50) * 50 : c.prix;
         await api.togglePayment({
           student_id: eleve.id,
@@ -278,12 +290,41 @@ async function seedInRenderer(d) {
     }
   }
 
+  // ---- Congés et retours ----
+  // Quelques élèves quittent l'établissement : ils doivent disparaître des
+  // listes actives et des grilles de paiement, tout en conservant l'historique
+  // de leurs paiements. L'un d'eux revient ensuite, ce qui exerce le cycle
+  // complet congé -> historique -> retour.
+  const motifsSortie = ['Déménagement', 'Fin de scolarité', 'Raisons familiales'];
+  const sortis = [];
+  for (let k = 0; k < indexesSortie.length; k += 1) {
+    const eleve = eleves[indexesSortie[k]];
+    if (!eleve) continue;
+    await api.basculerEleveActif({
+      student_id: eleve.id,
+      actif: 0,
+      motif: motifsSortie[k % motifsSortie.length]
+    });
+    sortis.push(eleve.id);
+  }
+  // Le dernier reprend sa scolarité : son historique porte alors un départ ET
+  // un retour, ce qui permet de vérifier la réactivation.
+  let retours = 0;
+  const revenu = sortis.pop();
+  if (revenu) {
+    await api.basculerEleveActif({ student_id: revenu, actif: 1, motif: 'Réinscription' });
+    retours = 1;
+  }
+
   return {
     matieres: matieres.length,
     enseignants: teachers.length,
     cours: allCoursApi.length,
     eleves: eleves.length,
     paiements: nbPaiements,
+    sortis: sortis.length,
+    retours,
+    solde: soldes.size,
     photos
   };
 }
@@ -338,6 +379,8 @@ app.whenReady().then(async () => {
     console.log(`  Élèves       : ${result.eleves}`);
     console.log(`  Paiements    : ${result.paiements}`);
     console.log(`  Photos       : ${imported.imported} associée(s)`);
+    console.log(`  Congés       : ${result.sortis} sorti(s), ${result.retours} revenu(s)`);
+    console.log(`  Soldés       : ${result.solde} élève(s) à jour`);
     console.log(`  Durée        : ${Math.round((Date.now() - startedAt) / 1000)} s`);
     console.log('');
     console.log(useRealDb
