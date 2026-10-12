@@ -1,0 +1,196 @@
+/*
+ * Système de design — Tailwind v4, CSS-first.
+ *
+ * Point d'entrée unique des jetons.(style.css consomme ces variables ;
+ * il ne définit plus de :root, donc la source de vérité est ici.)
+ *
+ * Compilation :
+ *   npm run build:css
+ * -> src/generated.css  (CSS statique, aucun JS à l'exécution)
+ */
+
+@import 'tailwindcss';
+
+/* ============================================================
+ *  PALETTE
+ * ============================================================ */
+@theme {
+  /* Marque — bleu El Kawther */
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #eaf1ff;
+  --color-brand-200: #cddcff;
+  --color-brand-300: #a8c2ff;
+  --color-brand-400: #6f97fb;
+  --color-brand-500: #2f6fed;
+  --color-brand-600: #1c54c9;
+  --color-brand-700: #17459e;
+  --color-brand-800: #16387c;
+  --color-brand-900: #163065;
+
+  /* Neutres — encres et surfaces */
+  --color-ink: #1e2733;
+  --color-ink-soft: #3d4a5c;
+  --color-muted: #6b7688;
+  --color-muted-soft: #8b95a6;
+  --color-line: #e3e8f0;
+  --color-line-strong: #cfd7e4;
+  --color-surface: #ffffff;
+  --color-canvas: #f2f5fb;
+  --color-canvas-deep: #e8edf6;
+
+  /* Sémantique */
+  --color-success: #1f9d55;
+  --color-success-soft: #e3f6e9;
+  --color-warning: #e08a1e;
+  --color-warning-soft: #fdf1de;
+  --color-danger: #e0503c;
+  --color-danger-soft: #fbe4e0;
+  --color-info: #0d9aa8;
+  --color-info-soft: #e0f5f7;
+
+  /* Carte d'élève — identité visuelle de l'établissement */
+  --color-card-maroon-1: #8a1518;
+  --color-card-maroon-2: #4a0c10;
+  --color-card-navy: #26313f;
+
+  /* Graphiques — palette catégorielle, testée sur fond clair */
+  --color-chart-1: #2f6fed;
+  --color-chart-2: #1f9d55;
+  --color-chart-3: #e08a1e;
+  --color-chart-4: #8b5cf6;
+  --color-chart-5: #e0524a;
+  --color-chart-6: #0d9aa8;
+  --color-chart-7: #c2418f;
+  --color-chart-8: #6b7280;
+
+  /* Noms historiques conservés : style.css les utilise partout. */
+  --blue-1: var(--color-brand-500);
+  --blue-2: var(--color-brand-600);
+  --blue-light: var(--color-brand-100);
+  --ink: var(--color-ink);
+  --muted: var(--color-muted);
+  --border: var(--color-line);
+  --bg: var(--color-canvas);
+  --danger: var(--color-danger);
+  --card-maroon-1: var(--color-card-maroon-1);
+  --card-maroon-2: var(--color-card-maroon-2);
+  --card-navy: var(--color-card-navy);
+
+  /* ============================================================
+   *  ÉCHELLES
+   * ============================================================ */
+
+  /* Rayons */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Espacement — échelle de 4 px */
+  --spacing: 0.25rem;
+
+  /* Typographie */
+  --font-sans: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --text-xs: 0.6875rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.4rem;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+
+  /* Ombres — progression doux → marqué */
+  --shadow-xs: 0 1px 2px rgba(20, 40, 90, 0.06);
+  --shadow-sm: 0 2px 6px rgba(20, 40, 90, 0.08);
+  --shadow-md: 0 6px 18px rgba(20, 40, 90, 0.12);
+  --shadow-lg: 0 14px 38px rgba(20, 40, 90, 0.16);
+  --shadow-focus: 0 0 0 3px rgba(47, 111, 237, 0.22);
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-in: fade-rise 0.22s var(--ease-out);
+}
+
+/* ============================================================
+ *  BASE
+ * ============================================================ */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Un anneau de focus unique et visible partout. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Barres de défilement discrètes, cohérentes avec la palette. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted-soft);
+    background-clip: content-box;
+  }
+}
+
+/* ============================================================
+ *  ANIMATIONS
+ * ============================================================ */
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

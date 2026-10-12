@@ -4,8 +4,8 @@
   "description": "Application de gestion des étudiants - inscription, recherche, cartes",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "demo": "electron demo.js",
+    "start": "npm run build:css && electron .",
+    "demo": "npm run build:css && electron demo.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "test:smoke": "electron smoke-test.js",
@@ -14,7 +14,9 @@
     "test:excel": "electron excel-test.js",
     "test:annee": "electron annee-test.js",
     "test:card": "electron card-check.js",
-    "screenshots": "electron screenshot.js"
+    "screenshots": "electron screenshot.js",
+    "build:css": "tailwindcss -i src/design-system.css -o src/generated.css --minify",
+    "watch": "tailwindcss -i src/design-system.css -o src/generated.css --watch"
   },
   "author": "",
   "license": "ISC",
@@ -30,12 +32,14 @@
     }
   },
   "dependencies": {
-    "sql.js": "^1.14.2",
     "chart.js": "^4.4.7",
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "sql.js": "^1.14.2"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "electron": "^32.0.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "tailwindcss": "^4.3.3"
   }
 }

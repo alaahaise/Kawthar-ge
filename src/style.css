@@ -1,18 +1,6 @@
-:root {
-  --blue-1: #2f6fed;
-  --blue-2: #1c54c9;
-  --blue-light: #eaf1ff;
-  --ink: #1e2733;
-  --muted: #6b7688;
-  --border: #e3e8f0;
-  --bg: #f2f5fb;
-  --danger: #e0503c;
-  --radius: 14px;
-
-  --card-maroon-1: #8a1518;
-  --card-maroon-2: #4a0c10;
-  --card-navy: #26313f;
-}
+/* Les jetons (couleurs, rayons, typographie, ombres) vivent désormais dans
+   design-system.css, compilé vers generated.css. Ce fichier ne décrit plus que
+   les composants. */
 
 * { box-sizing: border-box; }
 
