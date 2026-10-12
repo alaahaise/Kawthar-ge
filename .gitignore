@@ -5,3 +5,6 @@ out/
 .demo-data/
 screenshots/
 *.log
+.baseline/
+.demo-data/
+.splash-test/
