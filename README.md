@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Gestion des Étudiants — v1 (Inscription, Recherche, Cartes)
 
 Application de bureau (Electron + SQLite) pour gérer les étudiants.
@@ -53,3 +54,6 @@ student-app/
 - Filtres avancés (par classe, par plage de dates).
 - Code-barres ou QR code sur la carte étudiant.
 - Sauvegarde/restauration de la base de données.
+=======
+# Kawthar-ge
+>>>>>>> 77a98369f1645cc96e16ae1d79ba3bd761525b8a
